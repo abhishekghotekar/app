@@ -1,0 +1,209 @@
+import '../models/alert.dart';
+import '../models/attendance_record.dart';
+import '../models/camera.dart';
+import '../models/device.dart';
+import '../models/rule.dart';
+import '../models/student.dart';
+
+/// All hardcoded demo data for the CVAI UI prototype lives here.
+class MockData {
+  MockData._();
+
+  static final DateTime today = () {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }();
+
+  static DateTime _at(int hour, int minute) =>
+      DateTime(today.year, today.month, today.day, hour, minute);
+
+  // --- Current user profile ----------------------------------------------
+  static const Student currentUser = Student(
+    id: 'u-000',
+    name: 'Rahul Sharma',
+    rollNumber: 'ADM-001',
+    department: 'Administration',
+    className: '—',
+    role: 'Admin',
+    email: 'rahul@cvai.in',
+    phone: '+91 98200 11223',
+  );
+
+  // --- Device ------------------------------------------------------------
+  static const Device device = Device(
+    name: 'AttendanceDevice-A4F2',
+    model: 'Raspberry Pi 5 (8GB)',
+    firmware: 'v1.0.0',
+    serialNumber: 'RPI5-2026-A4F2-9X71',
+    ipAddress: '192.168.1.42',
+    wifiSsid: 'Office_5G',
+    signalStrength: 3,
+    online: true,
+    lastSync: '2 mins ago',
+    activeCameras: 3,
+  );
+
+  // --- BLE scan results --------------------------------------------------
+  static const List<BleDevice> bleDevices = [
+    BleDevice(name: 'AttendanceDevice-A4F2', signalLabel: 'Strong', rssiBars: 3),
+    BleDevice(name: 'AttendanceDevice-7C19', signalLabel: 'Good', rssiBars: 2),
+    BleDevice(name: 'CVAI-Setup-2200', signalLabel: 'Weak', rssiBars: 1),
+  ];
+
+  static const List<String> wifiNetworks = [
+    'Home_WiFi',
+    'Office_5G',
+    'Guest_Network',
+  ];
+
+  // --- Cameras -----------------------------------------------------------
+  static const List<CameraModel> cameras = [
+    CameraModel(
+      id: 'cam-1',
+      name: 'Main Gate Camera',
+      location: 'Front Entrance',
+      rtspUrl: 'rtsp://192.168.1.51:554/stream1',
+      online: true,
+      resolution: '1080p',
+      frameRate: 20,
+      detectedFaces: 3,
+      fps: 18,
+    ),
+    CameraModel(
+      id: 'cam-2',
+      name: 'Library Entrance',
+      location: 'Block C, Ground Floor',
+      rtspUrl: 'rtsp://192.168.1.52:554/h264',
+      online: true,
+      resolution: '720p',
+      frameRate: 15,
+      detectedFaces: 1,
+      fps: 15,
+    ),
+    CameraModel(
+      id: 'cam-3',
+      name: 'Hostel Block A',
+      location: 'Hostel A, Main Lobby',
+      rtspUrl: 'rtsp://192.168.1.53:554/live',
+      online: true,
+      resolution: '1080p',
+      frameRate: 15,
+      detectedFaces: 0,
+      fps: 14,
+    ),
+    CameraModel(
+      id: 'cam-4',
+      name: 'Cafeteria',
+      location: 'Block B, Mess Hall',
+      rtspUrl: 'rtsp://192.168.1.54:554/stream',
+      online: false,
+      resolution: '1080p',
+      frameRate: 10,
+      enabled: false,
+    ),
+  ];
+
+  // --- Rules -------------------------------------------------------------
+  static const List<Rule> rules = [
+    Rule(
+      id: 'rule-1',
+      name: 'Notify warden of absentees',
+      description: 'Sends the absentee list to the hostel warden every morning.',
+      schedule: 'Daily • 9:15 AM',
+      type: 'Time-based',
+      channels: ['WhatsApp', 'Push'],
+      recipients: ['Warden'],
+    ),
+    Rule(
+      id: 'rule-2',
+      name: 'Alert on late arrival',
+      description: 'Triggers when a student is marked in after 9:00 AM.',
+      schedule: 'Event • After 9:00 AM',
+      type: 'Event-based',
+      channels: ['Push'],
+      recipients: ['Class teacher', 'Admin'],
+    ),
+    Rule(
+      id: 'rule-3',
+      name: 'Daily summary report',
+      description: 'Compiles attendance totals and emails them to admin.',
+      schedule: 'Daily • 6:00 PM',
+      type: 'Time-based',
+      enabled: false,
+      channels: ['Email'],
+      recipients: ['Admin'],
+    ),
+  ];
+
+  // --- Students ----------------------------------------------------------
+  static const List<Student> students = [
+    Student(id: 's-01', name: 'Aarav Mehta', rollNumber: 'CSE-2201', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'aarav.m@cvai.in', phone: '+91 98101 20011', attendancePercent: 94, presentCount: 168, absentCount: 6, lateCount: 4, enrolledFaces: 5),
+    Student(id: 's-02', name: 'Priya Nair', rollNumber: 'CSE-2202', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'priya.n@cvai.in', phone: '+91 98101 20012', attendancePercent: 88, presentCount: 158, absentCount: 12, lateCount: 8, enrolledFaces: 5),
+    Student(id: 's-03', name: 'Rohan Verma', rollNumber: 'ECE-2203', department: 'ECE', className: 'Class 12B', role: 'Student', email: 'rohan.v@cvai.in', phone: '+91 98101 20013', attendancePercent: 76, presentCount: 137, absentCount: 28, lateCount: 13, enrolledFaces: 5),
+    Student(id: 's-04', name: 'Ananya Iyer', rollNumber: 'CSE-2204', department: 'CSE', className: 'Class 10A', role: 'Student', email: 'ananya.i@cvai.in', phone: '+91 98101 20014', attendancePercent: 97, presentCount: 174, absentCount: 3, lateCount: 1, enrolledFaces: 5),
+    Student(id: 's-05', name: 'Karan Singh', rollNumber: 'MECH-2205', department: 'Mech', className: 'Class 12B', role: 'Student', email: 'karan.s@cvai.in', phone: '+91 98101 20015', attendancePercent: 81, presentCount: 145, absentCount: 21, lateCount: 12, enrolledFaces: 5),
+    Student(id: 's-06', name: 'Sara Khan', rollNumber: 'ECE-2206', department: 'ECE', className: 'Class 10A', role: 'Student', email: 'sara.k@cvai.in', phone: '+91 98101 20016', attendancePercent: 91, presentCount: 163, absentCount: 9, lateCount: 6, enrolledFaces: 5),
+    Student(id: 's-07', name: 'Vikram Reddy', rollNumber: 'CSE-2207', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'vikram.r@cvai.in', phone: '+91 98101 20017', attendancePercent: 69, presentCount: 124, absentCount: 41, lateCount: 9, enrolledFaces: 5),
+    Student(id: 's-08', name: 'Meera Joshi', rollNumber: 'MECH-2208', department: 'Mech', className: 'Class 12B', role: 'Student', email: 'meera.j@cvai.in', phone: '+91 98101 20018', attendancePercent: 86, presentCount: 154, absentCount: 14, lateCount: 10, enrolledFaces: 5),
+    Student(id: 's-09', name: 'Arjun Pillai', rollNumber: 'ECE-2209', department: 'ECE', className: 'Class 10A', role: 'Student', email: 'arjun.p@cvai.in', phone: '+91 98101 20019', attendancePercent: 93, presentCount: 167, absentCount: 7, lateCount: 5, enrolledFaces: 5),
+    Student(id: 's-10', name: 'Isha Gupta', rollNumber: 'CSE-2210', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'isha.g@cvai.in', phone: '+91 98101 20020', attendancePercent: 99, presentCount: 178, absentCount: 1, lateCount: 0, enrolledFaces: 5),
+    Student(id: 's-11', name: 'Daniel George', rollNumber: 'MECH-2211', department: 'Mech', className: 'Class 12B', role: 'Student', email: 'daniel.g@cvai.in', phone: '+91 98101 20021', attendancePercent: 72, presentCount: 130, absentCount: 36, lateCount: 8, enrolledFaces: 5),
+    Student(id: 's-12', name: 'Fatima Sheikh', rollNumber: 'ECE-2212', department: 'ECE', className: 'Class 10A', role: 'Student', email: 'fatima.s@cvai.in', phone: '+91 98101 20022', attendancePercent: 90, presentCount: 162, absentCount: 10, lateCount: 7, enrolledFaces: 5),
+    Student(id: 's-13', name: 'Aditya Kulkarni', rollNumber: 'CSE-2213', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'aditya.k@cvai.in', phone: '+91 98101 20023', attendancePercent: 84, presentCount: 151, absentCount: 17, lateCount: 11, enrolledFaces: 5),
+    Student(id: 's-14', name: 'Neha Bhatt', rollNumber: 'ECE-2214', department: 'ECE', className: 'Class 12B', role: 'Student', email: 'neha.b@cvai.in', phone: '+91 98101 20024', attendancePercent: 95, presentCount: 171, absentCount: 5, lateCount: 3, enrolledFaces: 5),
+    Student(id: 's-15', name: 'Joseph Thomas', rollNumber: 'MECH-2215', department: 'Mech', className: 'Class 12B', role: 'Student', email: 'joseph.t@cvai.in', phone: '+91 98101 20025', attendancePercent: 78, presentCount: 140, absentCount: 25, lateCount: 14, enrolledFaces: 5),
+    Student(id: 's-16', name: 'Riya Malhotra', rollNumber: 'CSE-2216', department: 'CSE', className: 'Class 10A', role: 'Student', email: 'riya.m@cvai.in', phone: '+91 98101 20026', attendancePercent: 92, presentCount: 165, absentCount: 8, lateCount: 6, enrolledFaces: 5),
+    Student(id: 's-17', name: 'Sameer Ali', rollNumber: 'ECE-2217', department: 'ECE', className: 'Class 12A', role: 'Student', email: 'sameer.a@cvai.in', phone: '+91 98101 20027', attendancePercent: 87, presentCount: 156, absentCount: 13, lateCount: 9, enrolledFaces: 5),
+    Student(id: 's-18', name: 'Tanvi Desai', rollNumber: 'MECH-2218', department: 'Mech', className: 'Class 12B', role: 'Student', email: 'tanvi.d@cvai.in', phone: '+91 98101 20028', attendancePercent: 96, presentCount: 172, absentCount: 4, lateCount: 2, enrolledFaces: 5),
+    Student(id: 's-19', name: 'Lucas Fernandes', rollNumber: 'CSE-2219', department: 'CSE', className: 'Class 12A', role: 'Student', email: 'lucas.f@cvai.in', phone: '+91 98101 20029', attendancePercent: 74, presentCount: 133, absentCount: 33, lateCount: 10, enrolledFaces: 5),
+    Student(id: 's-20', name: 'Pooja Rao', rollNumber: 'ECE-2220', department: 'ECE', className: 'Class 10A', role: 'Student', email: 'pooja.r@cvai.in', phone: '+91 98101 20030', attendancePercent: 89, presentCount: 160, absentCount: 11, lateCount: 7, enrolledFaces: 5),
+    Student(id: 's-21', name: 'Harish Menon', rollNumber: 'EMP-3001', department: 'Faculty', className: 'Staff', role: 'Employee', email: 'harish.m@cvai.in', phone: '+91 98101 20031', attendancePercent: 98, presentCount: 176, absentCount: 2, lateCount: 1, enrolledFaces: 5),
+    Student(id: 's-22', name: 'Grace Mathew', rollNumber: 'EMP-3002', department: 'Faculty', className: 'Staff', role: 'Employee', email: 'grace.m@cvai.in', phone: '+91 98101 20032', attendancePercent: 94, presentCount: 169, absentCount: 6, lateCount: 4, enrolledFaces: 5),
+  ];
+
+  // --- Today's attendance records ---------------------------------------
+  static final List<AttendanceRecord> todayRecords = [
+    AttendanceRecord(id: 'a-01', studentId: 's-10', studentName: 'Isha Gupta', rollNumber: 'CSE-2210', department: 'CSE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 12)),
+    AttendanceRecord(id: 'a-02', studentId: 's-04', studentName: 'Ananya Iyer', rollNumber: 'CSE-2204', department: 'CSE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 19)),
+    AttendanceRecord(id: 'a-03', studentId: 's-01', studentName: 'Aarav Mehta', rollNumber: 'CSE-2201', department: 'CSE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 27)),
+    AttendanceRecord(id: 'a-04', studentId: 's-09', studentName: 'Arjun Pillai', rollNumber: 'ECE-2209', department: 'ECE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 34)),
+    AttendanceRecord(id: 'a-05', studentId: 's-18', studentName: 'Tanvi Desai', rollNumber: 'MECH-2218', department: 'Mech', status: AttendanceStatus.present, date: today, timeIn: _at(8, 41)),
+    AttendanceRecord(id: 'a-06', studentId: 's-06', studentName: 'Sara Khan', rollNumber: 'ECE-2206', department: 'ECE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 47)),
+    AttendanceRecord(id: 'a-07', studentId: 's-14', studentName: 'Neha Bhatt', rollNumber: 'ECE-2214', department: 'ECE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 52)),
+    AttendanceRecord(id: 'a-08', studentId: 's-16', studentName: 'Riya Malhotra', rollNumber: 'CSE-2216', department: 'CSE', status: AttendanceStatus.present, date: today, timeIn: _at(8, 58)),
+    AttendanceRecord(id: 'a-09', studentId: 's-03', studentName: 'Rohan Verma', rollNumber: 'ECE-2203', department: 'ECE', status: AttendanceStatus.late, date: today, timeIn: _at(9, 14)),
+    AttendanceRecord(id: 'a-10', studentId: 's-13', studentName: 'Aditya Kulkarni', rollNumber: 'CSE-2213', department: 'CSE', status: AttendanceStatus.late, date: today, timeIn: _at(9, 22)),
+    AttendanceRecord(id: 'a-11', studentId: 's-05', studentName: 'Karan Singh', rollNumber: 'MECH-2205', department: 'Mech', status: AttendanceStatus.late, date: today, timeIn: _at(9, 37)),
+    AttendanceRecord(id: 'a-12', studentId: 's-07', studentName: 'Vikram Reddy', rollNumber: 'CSE-2207', department: 'CSE', status: AttendanceStatus.absent, date: today),
+    AttendanceRecord(id: 'a-13', studentId: 's-11', studentName: 'Daniel George', rollNumber: 'MECH-2211', department: 'Mech', status: AttendanceStatus.absent, date: today),
+    AttendanceRecord(id: 'a-14', studentId: 's-19', studentName: 'Lucas Fernandes', rollNumber: 'CSE-2219', department: 'CSE', status: AttendanceStatus.absent, date: today),
+    AttendanceRecord(id: 'a-15', studentId: 's-15', studentName: 'Joseph Thomas', rollNumber: 'MECH-2215', department: 'Mech', status: AttendanceStatus.absent, date: today),
+  ];
+
+  // --- Dashboard quick stats --------------------------------------------
+  static const int presentToday = 142;
+  static const int absentToday = 18;
+  static const int lateToday = 7;
+  static const int totalPeople = 167;
+
+  /// Hourly attendance counts, 7 AM (index 0) through 6 PM (index 11).
+  static const List<double> hourlyAttendance = [
+    4, 38, 71, 18, 6, 3, 1, 0, 1, 0, 0, 0,
+  ];
+
+  // --- Alert history -----------------------------------------------------
+  static final List<Alert> alerts = [
+    Alert(id: 'al-1', type: AlertType.lateArrival, title: 'Late arrival detected', body: 'Rohan Verma marked in at 9:14 AM via Main Gate Camera.', time: _at(9, 14)),
+    Alert(id: 'al-2', type: AlertType.lateArrival, title: 'Late arrival detected', body: 'Aditya Kulkarni marked in at 9:22 AM via Main Gate Camera.', time: _at(9, 22)),
+    Alert(id: 'al-3', type: AlertType.absentee, title: 'Absentee report sent', body: '4 students marked absent. List delivered to the warden.', time: _at(9, 15)),
+    Alert(id: 'al-4', type: AlertType.deviceOffline, title: 'Camera offline', body: 'Cafeteria camera stopped responding and was marked offline.', time: _at(7, 48)),
+    Alert(id: 'al-5', type: AlertType.lateArrival, title: 'Late arrival detected', body: 'Karan Singh marked in at 9:37 AM via Library Entrance.', time: _at(9, 37)),
+    Alert(id: 'al-6', type: AlertType.intrusion, title: 'Unrecognized face', body: 'An unrecognized person was detected at Hostel Block A.', time: _at(10, 5)),
+    Alert(id: 'al-7', type: AlertType.summary, title: 'Daily summary ready', body: 'Yesterday: 138 present, 22 absent, 7 late.', time: DateTime(today.year, today.month, today.day - 1, 18, 0)),
+    Alert(id: 'al-8', type: AlertType.absentee, title: 'Absentee follow-up', body: 'Vikram Reddy has been absent for 2 consecutive days.', time: DateTime(today.year, today.month, today.day - 1, 9, 30)),
+  ];
+
+  // --- Recent dashboard activity ----------------------------------------
+  static List<AttendanceRecord> get recentActivity =>
+      todayRecords.where((r) => r.timeIn != null).toList().reversed.take(5).toList();
+}
