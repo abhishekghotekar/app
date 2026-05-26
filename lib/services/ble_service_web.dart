@@ -186,8 +186,15 @@ class BleService {
     required String password,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
+    final jsonMap = {
+      'ssid': ssid,
+      'password': password,
+      'psk': password,
+      'pass': password,
+      'pwd': password,
+    };
     final payload = Uint8List.fromList(
-      utf8.encode(jsonEncode({'ssid': ssid, 'password': password})),
+      utf8.encode(jsonEncode(jsonMap)),
     );
     try {
       await char.writeValueWithResponse(payload);

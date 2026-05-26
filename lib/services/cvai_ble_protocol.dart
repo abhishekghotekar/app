@@ -31,8 +31,8 @@
 class CvaiBle {
   CvaiBle._();
 
-  static const serviceUuid = 'c0a10001-1c41-4900-ad11-c151ab711a90';
-  static const wifiListCharUuid = 'c0a10002-1c41-4900-ad11-c151ab711a90';
-  static const wifiCredsCharUuid = 'c0a10003-1c41-4900-ad11-c151ab711a90';
-  static const statusCharUuid = 'c0a10004-1c41-4900-ad11-c151ab711a90';
+  static const serviceUuid = 'a07498ca-ad5b-474e-940d-16f1fbe7e8cd';
+  static const wifiListCharUuid = '51ff12bb-3ed8-46e5-b4f9-d64e2fec021b';
+  static const wifiCredsCharUuid = '51ff12bc-3ed8-46e5-b4f9-d64e2fec021b';
+  static const statusCharUuid = '51ff12bd-3ed8-46e5-b4f9-d64e2fec021b';
 }

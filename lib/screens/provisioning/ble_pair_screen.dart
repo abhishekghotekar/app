@@ -283,24 +283,6 @@ class _BlePairScreenState extends State<BlePairScreen> {
   Widget _ctas() {
     switch (_state) {
       case BleConnectionState.connected:
-        if (widget.device.kind == BluetoothKind.classic) {
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Classic Bluetooth pairing is complete.',
-                style: AppTextStyles.caption,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 10),
-              SecondaryButton(
-                label: 'Back to scan',
-                icon: LucideIcons.arrowLeft,
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          );
-        }
         return PrimaryButton(
           label: 'Continue',
           icon: LucideIcons.arrowRight,

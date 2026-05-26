@@ -43,6 +43,7 @@ dependencies:
   flutter_web_bluetooth: ^1.1.0
   flutter_blue_plus: ^2.3.3
   flutter_blue_classic: ^0.0.5
+  wifi_scan: ^0.4.0
 
 dev_dependencies:
   flutter_test:

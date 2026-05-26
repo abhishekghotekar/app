@@ -301,13 +301,14 @@ class BleService {
       await _connectBle(device, ctl);
     } else {
       await _bondClassic(device, ctl);
+      _log('classic bond successful, now connecting BLE GATT for provisioning...');
+      await _connectBle(device, ctl);
     }
   }
 
   /// Drop an active connection. No-op for Classic (the OS holds the bond).
   static Future<void> disconnect(ScannedDevice device) async {
     _log('disconnect:requested ${_deviceTag(device)}');
-    if (device.kind != BluetoothKind.ble) return;
     final fbpDev = _bleDeviceCache[device.id];
     if (fbpDev == null) return;
     if (!fbpDev.isConnected) return;
@@ -369,6 +370,16 @@ class BleService {
       );
       if (!ctl.isClosed) ctl.add(BleConnectionState.connected);
       _log('state:connected ${_deviceTag(device)}');
+
+      if (Platform.isAndroid) {
+        try {
+          _log('requesting MTU 512 for Android...');
+          await fbpDev.requestMtu(512, timeout: 5);
+          _log('MTU requested successfully');
+        } catch (e) {
+          _log('requestMtu failed: $e');
+        }
+      }
 
       // Now subscribe so a later disconnect is reflected in the UI.
       // skip(1) drops the initial "connected" replay we just observed.
@@ -454,6 +465,9 @@ class BleService {
   ) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiListCharUuid);
     final bytes = await char.read();
+    _log('Raw WiFi list bytes read: $bytes');
+    final decodedStr = utf8.decode(bytes, allowMalformed: true).trim();
+    _log('Raw WiFi list string: "$decodedStr"');
     return _decodeWifiList(bytes);
   }
 
@@ -466,10 +480,19 @@ class BleService {
     required String password,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
-    final payload =
-        utf8.encode(jsonEncode({'ssid': ssid, 'password': password}));
+    final jsonMap = {
+      'ssid': ssid,
+      'password': password,
+      'psk': password,
+      'pass': password,
+      'pwd': password,
+    };
+    final jsonStr = jsonEncode(jsonMap);
+    _log('Sending WiFi credentials JSON: $jsonStr');
+    final payload = utf8.encode(jsonStr);
     try {
       await char.write(payload);
+      _log('WiFi credentials successfully sent over BLE.');
     } catch (e) {
       throw BleException('Could not send credentials: $e');
     }
@@ -500,11 +523,6 @@ class BleService {
     ScannedDevice device,
     String charUuid,
   ) async {
-    if (device.kind != BluetoothKind.ble) {
-      throw BleException(
-        'WiFi provisioning is only available over BLE, not Classic.',
-      );
-    }
     final fbpDev = _bleDeviceCache[device.id] ??
         BluetoothDevice(remoteId: DeviceIdentifier(device.id));
     if (!fbpDev.isConnected) {
@@ -512,10 +530,37 @@ class BleService {
         'Bluetooth disconnected. Go back and pair the device again.',
       );
     }
-    final services = await fbpDev.discoverServices();
-    final svc = services.where(
+    var services = await fbpDev.discoverServices();
+    _log('Discovered ${services.length} services on "${device.name}" (${device.id}):');
+    for (final s in services) {
+      _log('  - Service: ${s.uuid.str}');
+      for (final c in s.characteristics) {
+        _log('      * Characteristic: ${c.uuid.str}');
+      }
+    }
+    var svc = services.where(
       (s) => s.uuid.str.toLowerCase() == CvaiBle.serviceUuid.toLowerCase(),
     );
+    if (svc.isEmpty) {
+      _log('CVAI service not found in cache. Clearing Android GATT cache and retrying...');
+      try {
+        await fbpDev.clearGattCache();
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        services = await fbpDev.discoverServices();
+        _log('Re-discovered ${services.length} services on "${device.name}" (${device.id}) after cache clear:');
+        for (final s in services) {
+          _log('  - Service: ${s.uuid.str}');
+          for (final c in s.characteristics) {
+            _log('      * Characteristic: ${c.uuid.str}');
+          }
+        }
+        svc = services.where(
+          (s) => s.uuid.str.toLowerCase() == CvaiBle.serviceUuid.toLowerCase(),
+        );
+      } catch (e) {
+        _log('Failed to clear GATT cache: $e');
+      }
+    }
     if (svc.isEmpty) {
       throw BleException(
         'This device is not a CVAI device — its Bluetooth services do '

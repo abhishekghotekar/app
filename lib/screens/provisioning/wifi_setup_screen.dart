@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:wifi_scan/wifi_scan.dart';
 
 import 'package:flutter/material.dart';
 import '../../theme/app_icons.dart';
@@ -40,8 +41,11 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   List<WifiNetwork> _networks = const [];
   WifiNetwork? _selected;
   final _password = TextEditingController();
+  final _ssidController = TextEditingController();
+  bool _manualSsid = false;
   bool _obscure = true;
   String? _error;
+  String? _sentSsid;
   StreamSubscription<ProvisionStatus>? _statusSub;
 
   @override
@@ -54,6 +58,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   @override
   void dispose() {
     _password.dispose();
+    _ssidController.dispose();
     _statusSub?.cancel();
     super.dispose();
   }
@@ -66,28 +71,49 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
       _error = null;
     });
     try {
-      final list = await BleService.listWifiNetworks(widget.device);
+      List<WifiNetwork> list = [];
+      final canScan = await WiFiScan.instance.canStartScan(askPermissions: true);
+      if (canScan == CanStartScan.yes) {
+        await WiFiScan.instance.startScan();
+        // Allow a brief moment for the scanner to populate results
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      
+      final results = await WiFiScan.instance.getScannedResults();
+      final mapped = results.map((ap) {
+        final caps = ap.capabilities.toUpperCase();
+        final secured = caps.contains('WPA') || caps.contains('WEP') || caps.contains('PSK');
+        return WifiNetwork(
+          ssid: ap.ssid,
+          rssi: ap.level,
+          secured: secured,
+        );
+      }).where((net) => net.ssid.isNotEmpty).toList();
+
+      final unique = <String, WifiNetwork>{};
+      for (final net in mapped) {
+        final existing = unique[net.ssid];
+        if (existing == null || (net.rssi ?? -999) > (existing.rssi ?? -999)) {
+          unique[net.ssid] = net;
+        }
+      }
+      list = unique.values.toList()
+        ..sort((a, b) => (b.rssi ?? -999).compareTo(a.rssi ?? -999));
+
       if (!mounted) return;
       setState(() {
         _networks = list;
         _selected = list.isNotEmpty ? list.first : null;
         _phase = list.isEmpty ? _Phase.failed : _Phase.ready;
         _error = list.isEmpty
-            ? 'Device did not return any WiFi networks. Move closer to your '
-                'router or restart the device, then try again.'
+            ? 'No WiFi networks found by your phone. Turn on your WiFi and Location, then try again.'
             : null;
-      });
-    } on BleException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = _Phase.failed;
-        _error = e.message;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _phase = _Phase.failed;
-        _error = e.toString();
+        _error = 'Failed to scan WiFi on phone: $e';
       });
     }
   }
@@ -106,15 +132,20 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   }
 
   Future<void> _send() async {
-    final ssid = _selected?.ssid;
-    if (ssid == null || ssid.isEmpty) return;
-    if (_selected?.secured == true && _password.text.isEmpty) {
+    final ssid = _manualSsid ? _ssidController.text.trim() : _selected?.ssid;
+    if (ssid == null || ssid.isEmpty) {
+      setState(() => _error = 'Enter the WiFi name (SSID) to continue.');
+      return;
+    }
+    final secured = _manualSsid ? _password.text.isNotEmpty : _selected?.secured == true;
+    if (secured && _password.text.isEmpty) {
       setState(() => _error = 'Enter the WiFi password to continue.');
       return;
     }
     setState(() {
       _phase = _Phase.sending;
       _error = null;
+      _sentSsid = ssid;
     });
     try {
       await BleService.sendWifiCredentials(
@@ -178,7 +209,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
               ? widget.device.name
               : 'CVAI device',
           ip: ip,
-          ssid: _selected?.ssid ?? '',
+          ssid: _sentSsid ?? _selected?.ssid ?? '',
         ),
       ),
     );
@@ -261,6 +292,18 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
             ),
             const SizedBox(height: 10),
             SecondaryButton(
+              label: 'Enter WiFi Manually',
+              icon: LucideIcons.pencil,
+              onPressed: () {
+                setState(() {
+                  _manualSsid = true;
+                  _phase = _Phase.ready;
+                  _error = null;
+                });
+              },
+            ),
+            const SizedBox(height: 10),
+            SecondaryButton(
               label: 'Back',
               icon: LucideIcons.arrowLeft,
               onPressed: () => Navigator.of(context).pop(),
@@ -300,20 +343,57 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Network', style: AppTextStyles.caption),
-        const SizedBox(height: 6),
-        _SsidDropdown(
-          networks: _networks,
-          value: _selected,
-          onChanged: (n) {
-            setState(() {
-              _selected = n;
-              _error = null;
-            });
-          },
-        ),
-        const SizedBox(height: 16),
-        if (_selected?.secured ?? true)
+        if (_manualSsid) ...[
+          AppTextField(
+            label: 'WiFi Name (SSID)',
+            hint: 'Enter your WiFi name',
+            prefixIcon: LucideIcons.wifi,
+            controller: _ssidController,
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _manualSsid = false;
+                  _error = null;
+                });
+              },
+              icon: const Icon(Icons.list, size: 16),
+              label: const Text('Select from list'),
+            ),
+          ),
+        ] else ...[
+          Text('Network', style: AppTextStyles.caption),
+          const SizedBox(height: 6),
+          _SsidDropdown(
+            networks: _networks,
+            value: _selected,
+            onChanged: (n) {
+              setState(() {
+                _selected = n;
+                _error = null;
+              });
+            },
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _manualSsid = true;
+                  _error = null;
+                });
+              },
+              icon: const Icon(LucideIcons.pencil, size: 14),
+              label: const Text('Enter WiFi name manually'),
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (_manualSsid || (_selected?.secured ?? true))
           AppTextField(
             label: 'WiFi Password',
             hint: 'Enter network password',
