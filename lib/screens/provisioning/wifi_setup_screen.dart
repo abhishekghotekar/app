@@ -7,6 +7,7 @@ import '../../theme/app_icons.dart';
 import '../../models/scanned_device.dart';
 import '../../models/wifi_network.dart';
 import '../../services/ble_service.dart';
+import '../../services/auth_storage.dart';
 import '../../services/device_storage.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
@@ -47,6 +48,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   String? _error;
   String? _sentSsid;
   StreamSubscription<ProvisionStatus>? _statusSub;
+  bool _tokenSent = false;
 
   @override
   void initState() {
@@ -146,6 +148,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
       _phase = _Phase.sending;
       _error = null;
       _sentSsid = ssid;
+      _tokenSent = false;
     });
     try {
       await BleService.sendWifiCredentials(
@@ -180,6 +183,38 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
           _phase = _Phase.failed;
           _error = status.message ?? 'The device could not join that network.';
         });
+        break;
+      case ProvisionState.request_token:
+        if (_tokenSent) {
+          debugPrint('[WiFiSetup] Token already sent, ignoring redundant status notification.');
+          break;
+        }
+        _tokenSent = true;
+        try {
+          final token = await AuthStorage.accessToken();
+          if (token != null && token.isNotEmpty) {
+            await BleService.sendToken(widget.device, token: token);
+            if (mounted) {
+              await _onConnected(ProvisionStatus(
+                state: ProvisionState.connected,
+                ip: 'Local Network',
+                token: token,
+              ));
+            }
+          } else {
+            setState(() => _error = 'No access token available to send.');
+          }
+        } on BleException catch (e) {
+          setState(() {
+            _phase = _Phase.failed;
+            _error = 'Failed to send token: ${e.message}';
+          });
+        } catch (e) {
+          setState(() {
+            _phase = _Phase.failed;
+            _error = 'Error sending token: $e';
+          });
+        }
         break;
     }
   }

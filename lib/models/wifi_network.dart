@@ -36,6 +36,9 @@ enum ProvisionState {
 
   /// Device gave up — wrong password, network out of range, etc.
   failed,
+
+  /// Device needs the access token to authenticate with the cloud.
+  request_token,
 }
 
 /// One status update from the device's status characteristic during the

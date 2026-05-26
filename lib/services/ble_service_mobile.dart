@@ -478,6 +478,7 @@ class BleService {
     ScannedDevice device, {
     required String ssid,
     required String password,
+    String? token,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
     final jsonMap = {
@@ -486,16 +487,48 @@ class BleService {
       'psk': password,
       'pass': password,
       'pwd': password,
+      if (token != null && token.isNotEmpty) ...{
+        'token': token,
+        'access_token': token,
+        'accessToken': token,
+      }
     };
     final jsonStr = jsonEncode(jsonMap);
     _log('Sending WiFi credentials JSON: $jsonStr');
     final payload = utf8.encode(jsonStr);
     try {
-      await char.write(payload);
+      await char.write(payload, allowLongWrite: true);
       _log('WiFi credentials successfully sent over BLE.');
     } catch (e) {
       throw BleException('Could not send credentials: $e');
     }
+  }
+
+  /// Write only the user's access token to the device when requested.
+  static Future<void> sendToken(
+    ScannedDevice device, {
+    required String token,
+  }) async {
+    final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
+    final formats = [
+      {'token': token},
+      {'access_token': token},
+      {'accessToken': token},
+    ];
+
+    for (final map in formats) {
+      final jsonStr = jsonEncode(map);
+      _log('Sending token format JSON: $jsonStr');
+      final payload = utf8.encode(jsonStr);
+      try {
+        await char.write(payload);
+        // Small delay to let the device process the write
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      } catch (e) {
+        throw BleException('Could not send token: $e');
+      }
+    }
+    _log('Token formats successfully sent over BLE.');
   }
 
   /// Subscribe to status notifications from the device. Always subscribe
@@ -603,18 +636,55 @@ class BleService {
 
   static ProvisionStatus _decodeStatus(List<int> bytes) {
     final str = utf8.decode(bytes, allowMalformed: true).trim();
+    _log('Received raw status notification: "$str"');
     if (str.isEmpty) {
       return const ProvisionStatus(
         state: ProvisionState.failed,
         message: 'Empty status from device.',
       );
     }
+    // 1. Try to parse as JSON map first
     try {
       final data = jsonDecode(str);
       if (data is Map) {
         return ProvisionStatus.fromJson(data.cast<String, dynamic>());
       }
-    } catch (_) {}
+    } catch (_) {
+      // Catch json parse error to fall back to plain-text matching
+    }
+
+    // 2. Parse as plain-text state
+    final normalized = str.toLowerCase().replaceAll(RegExp(r'[-_]'), '');
+    if (normalized == 'requesttoken' || normalized == 'token') {
+      return const ProvisionStatus(
+        state: ProvisionState.request_token,
+        message: 'Requesting access token',
+      );
+    } else if (normalized == 'connecting') {
+      return const ProvisionStatus(
+        state: ProvisionState.connecting,
+        message: 'Connecting to WiFi',
+      );
+    } else if (normalized == 'connected') {
+      return const ProvisionStatus(
+        state: ProvisionState.connected,
+        message: 'Connected to WiFi',
+      );
+    } else if (normalized == 'failed') {
+      return const ProvisionStatus(
+        state: ProvisionState.failed,
+        message: 'WiFi connection failed',
+      );
+    }
+
+    // Fallback logic for variations of token request text
+    if (normalized.contains('token')) {
+      return const ProvisionStatus(
+        state: ProvisionState.request_token,
+        message: 'Requesting access token (inferred)',
+      );
+    }
+
     return ProvisionStatus(
       state: ProvisionState.failed,
       message: 'Device sent unreadable status: $str',

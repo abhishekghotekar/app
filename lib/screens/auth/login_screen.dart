@@ -3,6 +3,7 @@ import '../../theme/app_icons.dart';
 
 import '../../services/auth_api.dart';
 import '../../services/auth_storage.dart';
+import '../../models/auth_session.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_text_field.dart';
@@ -71,7 +72,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _skipToApp() {
+  Future<void> _skipToApp() async {
+    await AuthStorage.saveSession(LoginResult(
+      accessToken: 'mock_access_token_from_skip_login',
+      refreshToken: 'mock_refresh_token',
+      publicToken: 'mock_public_token',
+      expiresIn: 3600,
+      user: const AuthUser(
+        id: 'mock_user_id',
+        firstName: 'Developer',
+        lastName: 'User',
+        email: 'dev@example.com',
+        phone: '1234567890',
+        status: 'active',
+      ),
+    ));
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
     );

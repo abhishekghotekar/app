@@ -203,6 +203,31 @@ class BleService {
     }
   }
 
+  static Future<void> sendToken(
+    ScannedDevice device, {
+    required String token,
+  }) async {
+    final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
+    final formats = [
+      {'token': token},
+      {'access_token': token},
+      {'accessToken': token},
+    ];
+
+    for (final map in formats) {
+      final payload = Uint8List.fromList(
+        utf8.encode(jsonEncode(map)),
+      );
+      try {
+        await char.writeValueWithResponse(payload);
+        // Small delay to let the device process the write
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+      } catch (e) {
+        throw BleException('Could not send token: $e');
+      }
+    }
+  }
+
   static Stream<ProvisionStatus> provisioningStatus(
     ScannedDevice device,
   ) async* {
@@ -286,12 +311,48 @@ class BleService {
       data.lengthInBytes,
     );
     final str = utf8.decode(bytes, allowMalformed: true).trim();
+    // 1. Try to parse as JSON map first
     try {
       final decoded = jsonDecode(str);
       if (decoded is Map) {
         return ProvisionStatus.fromJson(decoded.cast<String, dynamic>());
       }
-    } catch (_) {}
+    } catch (_) {
+      // Catch json parse error to fall back to plain-text matching
+    }
+
+    // 2. Parse as plain-text state
+    final normalized = str.toLowerCase().replaceAll(RegExp(r'[-_]'), '');
+    if (normalized == 'requesttoken' || normalized == 'token') {
+      return const ProvisionStatus(
+        state: ProvisionState.request_token,
+        message: 'Requesting access token',
+      );
+    } else if (normalized == 'connecting') {
+      return const ProvisionStatus(
+        state: ProvisionState.connecting,
+        message: 'Connecting to WiFi',
+      );
+    } else if (normalized == 'connected') {
+      return const ProvisionStatus(
+        state: ProvisionState.connected,
+        message: 'Connected to WiFi',
+      );
+    } else if (normalized == 'failed') {
+      return const ProvisionStatus(
+        state: ProvisionState.failed,
+        message: 'WiFi connection failed',
+      );
+    }
+
+    // Fallback logic for variations of token request text
+    if (normalized.contains('token')) {
+      return const ProvisionStatus(
+        state: ProvisionState.request_token,
+        message: 'Requesting access token (inferred)',
+      );
+    }
+
     return ProvisionStatus(
       state: ProvisionState.failed,
       message: 'Device sent unreadable status: $str',
