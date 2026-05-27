@@ -108,7 +108,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
       return;
     }
 
-    final employeeId = user.employeeId.trim();
+    final employeeId = user.id.isNotEmpty
+        ? user.id.trim()
+        : user.employeeId.trim();
     final clientId   = user.clientId.trim().isNotEmpty
         ? user.clientId.trim()
         : FaceRegisterApi.clientId;

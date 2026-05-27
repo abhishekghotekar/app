@@ -6,6 +6,7 @@ import '../../theme/app_icons.dart';
 import '../../data/mock_data.dart';
 import '../../models/alert.dart';
 import '../../models/attendance_record.dart';
+import '../../services/attendance_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_card.dart';
@@ -25,8 +26,93 @@ class _DashboardTabState extends State<DashboardTab> {
   late final List<Alert> _activeAlerts =
       MockData.alerts.where((a) => a.type != AlertType.summary).take(2).toList();
 
+  List<AttendanceRecord> _records = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await AttendanceApi.fetchAttendance(date: DateTime.now());
+      if (mounted) {
+        setState(() {
+          _records = data;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppColors.primary),
+            SizedBox(height: 12),
+            Text('Loading dashboard...', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+          ],
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.circleAlert, color: AppColors.danger, size: 36),
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: AppTextStyles.caption.copyWith(color: AppColors.danger),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _fetchData,
+                icon: const Icon(LucideIcons.refreshCw, size: 14),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final recentActivity = _records
+        .where((r) => r.timeIn != null)
+        .toList()
+        ..sort((a, b) => b.timeIn!.compareTo(a.timeIn!));
+    final recentCount = recentActivity.take(5).toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
       children: [
@@ -46,14 +132,21 @@ class _DashboardTabState extends State<DashboardTab> {
         const SizedBox(height: 12),
         AppCard(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (var i = 0; i < MockData.recentActivity.length; i++) ...[
-                if (i > 0) const Divider(),
-                _activityRow(MockData.recentActivity[i]),
-              ],
-            ],
-          ),
+          child: recentCount.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text('No check-ins today yet.'),
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < recentCount.length; i++) ...[
+                      if (i > 0) const Divider(),
+                      _activityRow(recentCount[i]),
+                    ],
+                  ],
+                ),
         ),
         if (_activeAlerts.isNotEmpty) ...[
           const SizedBox(height: 24),
@@ -101,15 +194,22 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _quickStats() {
+    final presentToday = _records
+        .where((r) => r.status == AttendanceStatus.present || r.status == AttendanceStatus.late)
+        .length;
+    final absentToday = _records.where((r) => r.status == AttendanceStatus.absent).length;
+    final lateToday = _records.where((r) => r.status == AttendanceStatus.late).length;
+    final totalPeople = _records.length;
+
     final stats = [
-      _Stat('Present Today', '${MockData.presentToday}', AppColors.success,
-          '▲ 2.3% vs yesterday'),
-      _Stat('Absent', '${MockData.absentToday}', AppColors.danger,
-          '▼ 1.1% vs yesterday'),
-      _Stat('Late', '${MockData.lateToday}', AppColors.warning,
-          '▲ 0.4% vs yesterday'),
-      _Stat('Total', '${MockData.totalPeople}', AppColors.primary,
-          'Enrolled people'),
+      _Stat('Present Today', '$presentToday', AppColors.success,
+          'Active check-ins'),
+      _Stat('Absent', '$absentToday', AppColors.danger,
+          'Not checked in'),
+      _Stat('Late', '$lateToday', AppColors.warning,
+          'Checked in late'),
+      _Stat('Total', '$totalPeople', AppColors.primary,
+          'Total members'),
     ];
     return SizedBox(
       height: 124,

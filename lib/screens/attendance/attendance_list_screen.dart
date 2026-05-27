@@ -5,6 +5,7 @@ import '../../theme/app_icons.dart';
 import '../../data/mock_data.dart';
 import '../../models/attendance_record.dart';
 import '../../models/student.dart';
+import '../../services/attendance_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_card.dart';
@@ -13,8 +14,6 @@ import '../../widgets/status_pill.dart';
 import '../../widgets/user_avatar.dart';
 import 'export_screen.dart';
 import 'student_detail_screen.dart';
-
-
 
 class AttendanceListScreen extends StatefulWidget {
   const AttendanceListScreen({super.key});
@@ -28,18 +27,53 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
   int _statusTab = 0; // 0 All, 1 Present, 2 Absent, 3 Late
   String _deptFilter = 'All';
 
+  List<AttendanceRecord> _records = [];
+  bool _loading = true;
+  String? _error;
+
   static const _tabs = ['All', 'Present', 'Absent', 'Late'];
   static const _depts = ['All', 'CSE', 'ECE', 'Mech', 'Faculty'];
 
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final data = await AttendanceApi.fetchAttendance(date: _date);
+      if (mounted) {
+        setState(() {
+          _records = data;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
   List<AttendanceRecord> get _filtered {
-    return MockData.todayRecords.where((r) {
+    return _records.where((r) {
       final statusOk = switch (_statusTab) {
         1 => r.status == AttendanceStatus.present,
         2 => r.status == AttendanceStatus.absent,
         3 => r.status == AttendanceStatus.late,
         _ => true,
       };
-      final deptOk = _deptFilter == 'All' || r.department == _deptFilter;
+      final deptOk = _deptFilter == 'All' || r.department.toLowerCase() == _deptFilter.toLowerCase();
       return statusOk && deptOk;
     }).toList();
   }
@@ -51,12 +85,14 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
       firstDate: DateTime(2025),
       lastDate: DateTime(2027),
     );
-    if (picked != null) setState(() => _date = picked);
+    if (picked != null) {
+      setState(() => _date = picked);
+      _fetchData();
+    }
   }
 
   Future<void> _refresh() async {
-    await Future<void>.delayed(const Duration(seconds: 1));
-    if (mounted) setState(() {});
+    await _fetchData();
   }
 
   @override
@@ -139,23 +175,63 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
           child: RefreshIndicator(
             color: AppColors.primary,
             onRefresh: _refresh,
-            child: records.isEmpty
+            child: _loading
                 ? ListView(
+                    shrinkWrap: true,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     children: const [
-                      SizedBox(height: 80),
-                      EmptyState(
-                        icon: LucideIcons.userCheck,
-                        title: 'No records',
-                        subtitle: 'No attendance entries match these filters.',
+                      SizedBox(height: 120),
+                      Center(
+                        child: CircularProgressIndicator(color: AppColors.primary),
                       ),
                     ],
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                    itemCount: records.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _recordCard(records[i]),
-                  ),
+                : _error != null
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
+                        children: [
+                          const Icon(LucideIcons.circleAlert, color: AppColors.danger, size: 36),
+                          const SizedBox(height: 12),
+                          Text(
+                            _error!,
+                            style: AppTextStyles.caption.copyWith(color: AppColors.danger),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          Center(
+                            child: ElevatedButton.icon(
+                              onPressed: _fetchData,
+                              icon: const Icon(LucideIcons.refreshCw, size: 14),
+                              label: const Text('Retry'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : records.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 80),
+                              EmptyState(
+                                icon: LucideIcons.userCheck,
+                                title: 'No records',
+                                subtitle: 'No attendance entries match these filters.',
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                            itemCount: records.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
+                            itemBuilder: (_, i) => _recordCard(records[i]),
+                          ),
           ),
         ),
       ],

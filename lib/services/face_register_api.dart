@@ -23,7 +23,7 @@ class FaceRegisterApi {
   FaceRegisterApi._();
 
   /// Change this to your current ngrok URL.
-  static const String baseUrl = 'https://a447-103-112-11-19.ngrok-free.app';
+  static const String baseUrl = 'https://c24d-103-112-11-19.ngrok-free.app';
 
   /// The client (organisation) ID for all face API calls.
   static const String clientId = '6cf65b7d-5400-4c84-a56d-c7bad2e3b79d';
