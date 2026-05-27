@@ -1,9 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import '../../theme/app_icons.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/app_icons.dart';
 import '../../theme/app_text_styles.dart';
 
+/// Full-screen wizard that captures up to 5 face photos.
+///
+/// Returns `List<File>` when done, or `null` if the user cancels.
 class FaceEnrollmentScreen extends StatefulWidget {
   const FaceEnrollmentScreen({super.key});
 
@@ -11,7 +17,9 @@ class FaceEnrollmentScreen extends StatefulWidget {
   State<FaceEnrollmentScreen> createState() => _FaceEnrollmentScreenState();
 }
 
-class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
+class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
+    with SingleTickerProviderStateMixin {
+  static const _maxPhotos = 5;
   static const _prompts = [
     'Look straight at the camera',
     'Turn slightly left',
@@ -20,111 +28,384 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> {
     'Tilt your head down',
   ];
 
-  int _captured = 0;
+  final _picker = ImagePicker();
+  final List<File> _photos = [];
 
-  void _capture() {
-    if (_captured >= 5) return;
-    setState(() => _captured++);
-    if (_captured >= 5) {
-      Future<void>.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) Navigator.of(context).pop(_captured);
-      });
-    }
+  bool _capturing = false;
+  String? _errorMsg; // shown inline so user can see what went wrong
+
+  // Pulse animation for the face oval
+  late final AnimationController _pulseCtrl;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
   }
 
   @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _done => _photos.length >= _maxPhotos;
+
+  // ── Open system camera ──────────────────────────────────────────────────────
+  // NOTE: We let image_picker handle permission internally.
+  //       Do NOT call permission_handler before this — it causes conflicts.
+  Future<void> _capture() async {
+    if (_capturing || _done) return;
+
+    setState(() {
+      _capturing = true;
+      _errorMsg = null;
+    });
+
+    try {
+      // ⚠️ Do NOT pass preferredCameraDevice — it silently fails on many devices.
+      final XFile? picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1280,
+        maxHeight: 1280,
+      );
+
+      if (!mounted) return;
+
+      if (picked == null) {
+        // User cancelled the camera without taking a photo — not an error
+        setState(() => _errorMsg = null);
+        return;
+      }
+
+      // Verify the file actually exists on disk
+      final file = File(picked.path);
+      if (!file.existsSync()) {
+        setState(() =>
+            _errorMsg = 'Photo file not found. Please try again.');
+        return;
+      }
+
+      setState(() => _photos.add(file));
+
+      // Auto-close after last shot with a brief success pause
+      if (_photos.length >= _maxPhotos) {
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        if (mounted) Navigator.of(context).pop(_photos);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMsg = 'Camera failed: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _capturing = false);
+    }
+  }
+
+  void _removePhoto(int index) {
+    setState(() {
+      _photos.removeAt(index);
+      _errorMsg = null;
+    });
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
+  @override
   Widget build(BuildContext context) {
-    final done = _captured >= 5;
-    final prompt = done
-        ? 'All photos captured!'
-        : _prompts[_captured];
+    final count = _photos.length;
+    final bool hasError = _errorMsg != null;
+    final prompt = _done ? 'All photos captured!' : _prompts[count];
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: IconButton(
-                icon: const Icon(LucideIcons.x, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            // ── Top bar ──────────────────────────────────────────────────
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon:
+                        const Icon(LucideIcons.x, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white12,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$count / $_maxPhotos',
+                      style: AppTextStyles.bodyStrong
+                          .copyWith(color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              prompt,
-              style: AppTextStyles.title.copyWith(color: Colors.white),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              done ? 'Wrapping up…' : 'Hold still while we capture',
-              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-            ),
-            const Spacer(),
-            Container(
-              width: 240,
-              height: 300,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(140),
-                border: Border.all(
-                  color: done ? AppColors.success : Colors.white,
-                  width: 3,
+
+            // ── Prompt ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Column(
+                  key: ValueKey(count),
+                  children: [
+                    Text(
+                      prompt,
+                      style: AppTextStyles.title
+                          .copyWith(color: Colors.white),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _done
+                          ? 'Wrapping up…'
+                          : 'Tap the shutter button to take a photo',
+                      style: AppTextStyles.caption
+                          .copyWith(color: Colors.white54),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
               ),
-              child: Icon(
-                done ? LucideIcons.check : LucideIcons.scanFace,
-                size: 72,
-                color: done ? AppColors.success : Colors.white24,
+            ),
+            const SizedBox(height: 16),
+
+            // ── Error banner ─────────────────────────────────────────────
+            AnimatedSize(
+              duration: const Duration(milliseconds: 300),
+              child: hasError
+                  ? Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.danger.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.circleAlert,
+                              color: Colors.white, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMsg!,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12.5),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _errorMsg = null),
+                            child: const Icon(LucideIcons.x,
+                                color: Colors.white, size: 14),
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+
+            // ── Face oval ────────────────────────────────────────────────
+            Expanded(
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, child) => Transform.scale(
+                    scale: _done ? 1.0 : _pulse.value,
+                    child: child,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    width: 220,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(130),
+                      border: Border.all(
+                        color: _done
+                            ? AppColors.success
+                            : hasError
+                                ? AppColors.danger
+                                : Colors.white,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _done
+                              ? AppColors.success.withValues(alpha: 0.4)
+                              : hasError
+                                  ? AppColors.danger.withValues(alpha: 0.3)
+                                  : Colors.white.withValues(alpha: 0.06),
+                          blurRadius: 28,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(130),
+                      child: _photos.isNotEmpty
+                          ? Image.file(
+                              _photos.last,
+                              fit: BoxFit.cover,
+                              color: Colors.black
+                                  .withValues(alpha: _done ? 0 : 0.18),
+                              colorBlendMode: BlendMode.darken,
+                            )
+                          : Icon(
+                              LucideIcons.scanFace,
+                              size: 72,
+                              color: Colors.white24,
+                            ),
+                    ),
+                  ),
+                ),
               ),
             ),
-            const Spacer(),
+
+            // ── Thumbnail strip ──────────────────────────────────────────
+            if (_photos.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: SizedBox(
+                  height: 68,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _photos.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: 8),
+                    itemBuilder: (_, i) => Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            _photos[i],
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: GestureDetector(
+                            onTap: () => _removePhoto(i),
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: const BoxDecoration(
+                                color: AppColors.danger,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(LucideIcons.x,
+                                  size: 10, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 14),
+
+            // ── Progress pills ───────────────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                for (var i = 0; i < 5; i++)
-                  Container(
-                    width: 10,
+                for (var i = 0; i < _maxPhotos; i++)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                    width: i < count ? 26 : 10,
                     height: 10,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 3),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: i < _captured
+                      borderRadius: BorderRadius.circular(5),
+                      color: i < count
                           ? AppColors.success
                           : Colors.white24,
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 22),
+
+            // ── Shutter button ───────────────────────────────────────────
             GestureDetector(
               onTap: _capture,
-              child: Container(
-                width: 72,
-                height: 72,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 4),
-                ),
-                child: Container(
-                  margin: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: done ? AppColors.success : Colors.white,
+                  border: Border.all(
+                    color: _done
+                        ? AppColors.success
+                        : hasError
+                            ? AppColors.danger
+                            : Colors.white,
+                    width: 4,
                   ),
-                  child: done
-                      ? const Icon(LucideIcons.check,
-                          color: Colors.white, size: 28)
-                      : null,
+                ),
+                child: Center(
+                  child: _capturing
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(
+                                Colors.white),
+                          ),
+                        )
+                      : AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _done
+                                ? AppColors.success
+                                : Colors.white,
+                          ),
+                          child: _done
+                              ? const Icon(LucideIcons.check,
+                                  color: Colors.white, size: 32)
+                              : null,
+                        ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+
             Text(
-              '$_captured of 5 captured',
-              style: AppTextStyles.caption.copyWith(color: Colors.white),
+              _done
+                  ? '✓  All done!'
+                  : '$count of $_maxPhotos captured',
+              style: AppTextStyles.caption
+                  .copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 28),
           ],

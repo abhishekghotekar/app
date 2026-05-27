@@ -57,6 +57,9 @@ class LucideIcons {
   static const IconData alertCircle     = Icons.error_outline;
   static const IconData alertTriangle   = Icons.warning_amber_outlined;
   static const IconData checkCircle2    = Icons.check_circle_outline;
+  static const IconData checkCircle     = Icons.check_circle_outline;
+  static const IconData circleAlert     = Icons.error_outline;
+  static const IconData circleCheck     = Icons.check_circle_outline;
   static const IconData shieldAlert     = Icons.security;
   static const IconData clock           = Icons.access_time;
   static const IconData zap             = Icons.bolt;
@@ -75,4 +78,6 @@ class LucideIcons {
   static const IconData info            = Icons.info_outline;
   static const IconData plugZap         = Icons.power_outlined;
   static const IconData trash2          = Icons.delete_outline;
+  static const IconData server          = Icons.dns_outlined;
+  static const IconData userPlus        = Icons.person_add_outlined;
 }

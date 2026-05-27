@@ -22,6 +22,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Camera: face enrollment. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Read captured photos (Android 13+, API 33+). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- Notifications: attendance alerts (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
@@ -72,6 +74,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Allow app to query and launch the system camera. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE"/>
         </intent>
     </queries>
 </manifest>
