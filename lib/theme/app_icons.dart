@@ -80,4 +80,10 @@ class LucideIcons {
   static const IconData trash2          = Icons.delete_outline;
   static const IconData server          = Icons.dns_outlined;
   static const IconData userPlus        = Icons.person_add_outlined;
+
+  // id / organisation
+  static const IconData idCard          = Icons.badge_outlined;
+  static const IconData building2       = Icons.business_outlined;
+  static const IconData layoutGrid      = Icons.grid_view_outlined;
+  static const IconData hash            = Icons.tag;
 }

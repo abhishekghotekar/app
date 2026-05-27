@@ -15,7 +15,7 @@ class ResolutionDropdown extends StatelessWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  static const _options = ['720p', '1080p', '4K'];
+  static const _options = ['720p', '768p', '1080p', '4K'];
 
   @override
   Widget build(BuildContext context) {

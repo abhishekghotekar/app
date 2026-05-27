@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/app_icons.dart';
@@ -28,7 +28,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     'Tilt your head down',
   ];
 
-  final _picker = ImagePicker();
+  CameraController? _controller;
+  bool _isCameraInitialized = false;
+  bool _isCameraPermissionDenied = false;
   final List<File> _photos = [];
 
   bool _capturing = false;
@@ -48,12 +50,70 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     _pulse = Tween<double>(begin: 1.0, end: 1.06).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
+    _initCamera();
   }
 
   @override
   void dispose() {
     _pulseCtrl.dispose();
+    _controller?.dispose();
     super.dispose();
+  }
+
+  Future<void> _initCamera() async {
+    setState(() {
+      _isCameraInitialized = false;
+      _isCameraPermissionDenied = false;
+      _errorMsg = null;
+    });
+
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        setState(() {
+          _errorMsg = 'No cameras found on device';
+        });
+        return;
+      }
+
+      CameraDescription? frontCamera;
+      for (var camera in cameras) {
+        if (camera.lensDirection == CameraLensDirection.front) {
+          frontCamera = camera;
+          break;
+        }
+      }
+
+      final cameraToUse = frontCamera ?? cameras.first;
+
+      _controller = CameraController(
+        cameraToUse,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+
+      await _controller!.initialize();
+      if (!mounted) return;
+
+      setState(() {
+        _isCameraInitialized = true;
+      });
+    } on CameraException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        if (e.code == 'CameraAccessDenied') {
+          _isCameraPermissionDenied = true;
+          _errorMsg = 'Camera permission denied. Please enable camera access in system settings.';
+        } else {
+          _errorMsg = 'Camera initialization failed: ${e.description}';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMsg = 'Failed to initialize camera: $e';
+      });
+    }
   }
 
   bool get _done => _photos.length >= _maxPhotos;
@@ -62,7 +122,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
   // NOTE: We let image_picker handle permission internally.
   //       Do NOT call permission_handler before this — it causes conflicts.
   Future<void> _capture() async {
-    if (_capturing || _done) return;
+    if (_capturing || _done || _controller == null || !_isCameraInitialized) return;
 
     setState(() {
       _capturing = true;
@@ -70,23 +130,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
     });
 
     try {
-      // ⚠️ Do NOT pass preferredCameraDevice — it silently fails on many devices.
-      final XFile? picked = await _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-        maxWidth: 1280,
-        maxHeight: 1280,
-      );
+      final XFile picked = await _controller!.takePicture();
 
       if (!mounted) return;
 
-      if (picked == null) {
-        // User cancelled the camera without taking a photo — not an error
-        setState(() => _errorMsg = null);
-        return;
-      }
-
-      // Verify the file actually exists on disk
       final file = File(picked.path);
       if (!file.existsSync()) {
         setState(() =>
@@ -103,7 +150,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMsg = 'Camera failed: $e');
+        setState(() => _errorMsg = 'Camera capture failed: $e');
       }
     } finally {
       if (mounted) setState(() => _capturing = false);
@@ -262,19 +309,50 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(130),
-                      child: _photos.isNotEmpty
+                      child: _done
                           ? Image.file(
                               _photos.last,
                               fit: BoxFit.cover,
-                              color: Colors.black
-                                  .withValues(alpha: _done ? 0 : 0.18),
-                              colorBlendMode: BlendMode.darken,
                             )
-                          : Icon(
-                              LucideIcons.scanFace,
-                              size: 72,
-                              color: Colors.white24,
-                            ),
+                          : (_controller == null || !_isCameraInitialized)
+                              ? (_isCameraPermissionDenied
+                                  ? Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          LucideIcons.videoOff,
+                                          size: 48,
+                                          color: Colors.white54,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                                          child: Text(
+                                            'Camera permission is required.',
+                                            style: AppTextStyles.caption.copyWith(color: Colors.white54),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        TextButton(
+                                          onPressed: _initCamera,
+                                          child: const Text('Try Again', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ],
+                                    )
+                                  : const Center(
+                                      child: CircularProgressIndicator(
+                                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                                      ),
+                                    ))
+                              : FittedBox(
+                                  fit: BoxFit.cover,
+                                  child: SizedBox(
+                                    width: 220,
+                                    height: 220 * _controller!.value.aspectRatio,
+                                    child: CameraPreview(_controller!),
+                                  ),
+                                ),
                     ),
                   ),
                 ),

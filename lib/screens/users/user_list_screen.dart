@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_icons.dart';
 
-import '../../data/mock_data.dart';
-import '../../models/student.dart';
+import '../../models/api_user.dart';
+import '../../services/user_list_api.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_icons.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/secondary_button.dart';
-import '../../widgets/user_avatar.dart';
-import '../attendance/student_detail_screen.dart';
 import 'add_user_screen.dart';
 
 class UserListScreen extends StatefulWidget {
@@ -21,59 +19,108 @@ class UserListScreen extends StatefulWidget {
 }
 
 class _UserListScreenState extends State<UserListScreen> {
+  // ── State ─────────────────────────────────────────────────────────────────
   final _search = TextEditingController();
-  String _query = '';
-  String _filter = 'All';
+  String _query      = '';
+  String _regFilter  = 'all'; // 'all' | 'register' | 'unregister'
+  String _deptFilter = 'All'; // 'All' | 'CSE' | 'ECE' | ...
 
-  static const _filters = ['All', 'Students', 'Employees', 'CSE', 'ECE', 'Mech'];
+  List<ApiUser> _allUsers  = [];
+  bool   _loading = false;
+  bool   _firstLoad = true;
+  String? _error;
+
+  int _registeredCount = 0;
+  int _unregisteredCount = 0;
+
+  static const _deptFilters = ['All', 'CSE', 'ECE', 'Mech', 'Faculty', 'Admin'];
 
   @override
   void initState() {
     super.initState();
-    _search.addListener(() {
-      if (_query != _search.text) {
-        setState(() => _query = _search.text);
-      }
-    });
+    _search.addListener(_onSearch);
+    _loadUsers();
   }
 
   @override
   void dispose() {
+    _search.removeListener(_onSearch);
     _search.dispose();
     super.dispose();
   }
 
-  List<Student> get _filtered {
-    return MockData.students.where((s) {
+  void _onSearch() {
+    if (_query != _search.text) setState(() => _query = _search.text);
+  }
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────
+  Future<void> _loadUsers({bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = null; });
+
+    try {
+      final res = await UserListApi.fetchUsers();
+      final fetched = res.users;
+
+      if (mounted) {
+        setState(() {
+          _allUsers  = fetched;
+          _registeredCount = fetched.where((u) => u.isRegistered).length;
+          _unregisteredCount = fetched.where((u) => !u.isRegistered).length;
+          _loading   = false;
+          _firstLoad = false;
+          _error     = null;
+        });
+      }
+    } on UserListException catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  // ── Filtered list ─────────────────────────────────────────────────────────
+  List<ApiUser> get _filtered {
+    return _allUsers.where((u) {
+      // Registration filter (server already filtered, keeping it is safe)
+      if (_regFilter == 'register'   && !u.isRegistered) return false;
+      if (_regFilter == 'unregister' && u.isRegistered)  return false;
+
+      // Department filter
+      if (_deptFilter != 'All') {
+        final dept = (u.department ?? '').toLowerCase();
+        if (dept != _deptFilter.toLowerCase()) return false;
+      }
+
+      // Search
       final q = _query.toLowerCase();
-      final matchesQuery = q.isEmpty ||
-          s.name.toLowerCase().contains(q) ||
-          s.rollNumber.toLowerCase().contains(q);
-      final matchesFilter = switch (_filter) {
-        'All' => true,
-        'Students' => s.role == 'Student',
-        'Employees' => s.role == 'Employee',
-        _ => s.department == _filter,
-      };
-      return matchesQuery && matchesFilter;
+      if (q.isEmpty) return true;
+      return u.fullName.toLowerCase().contains(q) ||
+             u.employeeId.toLowerCase().contains(q) ||
+             (u.department ?? '').toLowerCase().contains(q);
     }).toList();
   }
 
-  void _addUser() {
-    Navigator.of(context).push(
+  // ── Add user ──────────────────────────────────────────────────────────────
+  Future<void> _addUser() async {
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const AddUserScreen()),
     );
+    // Refresh silently after returning from add screen
+    _loadUsers(silent: true);
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final users = _filtered;
     return Column(
       children: [
+        // ── Header controls ────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Search + Add
               Row(
                 children: [
                   Expanded(
@@ -81,7 +128,6 @@ class _UserListScreenState extends State<UserListScreen> {
                       hint: 'Search by name or ID',
                       prefixIcon: LucideIcons.search,
                       controller: _search,
-                      onTap: () {},
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -93,45 +139,223 @@ class _UserListScreenState extends State<UserListScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+
+              // Registered / Unregistered pills
+              if (!_firstLoad)
+                Row(
+                  children: [
+                    _regPill(
+                      label: '$_registeredCount Registered',
+                      icon: LucideIcons.checkCircle,
+                      value: 'register',
+                      activeColor: AppColors.success,
+                      bg: AppColors.successBg,
+                    ),
+                    const SizedBox(width: 8),
+                    _regPill(
+                      label: '$_unregisteredCount Unregistered',
+                      icon: LucideIcons.alertCircle,
+                      value: 'unregister',
+                      activeColor: AppColors.warning,
+                      bg: AppColors.warningBg,
+                    ),
+                    const Spacer(),
+                    // Refresh button
+                    InkWell(
+                      onTap: _loading ? null : _loadUsers,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.textMuted,
+                                ),
+                              )
+                            : const Icon(LucideIcons.refresh,
+                                size: 18, color: AppColors.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 10),
+
+              // Department chips
               SizedBox(
                 height: 32,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _filters.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => _chip(_filters[i]),
+                  itemCount: _deptFilters.length,
+                  separatorBuilder: (_, sep) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => _deptChip(_deptFilters[i]),
                 ),
               ),
               const SizedBox(height: 4),
             ],
           ),
         ),
-        Expanded(
-          child: users.isEmpty
-              ? const EmptyState(
-                  icon: LucideIcons.users,
-                  title: 'No users found',
-                  subtitle: 'Try a different search or filter.',
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                  itemCount: users.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) => _userCard(users[i]),
-                ),
-        ),
+
+        // ── Body ────────────────────────────────────────────────────────────
+        Expanded(child: _buildBody()),
       ],
     );
   }
 
-  Widget _chip(String label) {
-    final selected = _filter == label;
+  Widget _buildBody() {
+    // First load spinner
+    if (_firstLoad && _loading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.primary),
+            const SizedBox(height: 16),
+            Text('Loading users…', style: AppTextStyles.caption),
+          ],
+        ),
+      );
+    }
+
+    // Error state
+    if (_error != null && _allUsers.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(LucideIcons.alertCircle,
+                  size: 48, color: AppColors.danger),
+              const SizedBox(height: 16),
+              Text(
+                'Failed to load users',
+                style: AppTextStyles.bodyStrong,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: AppTextStyles.caption,
+                textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _loadUsers,
+                icon: const Icon(LucideIcons.refresh, size: 16),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final users = _filtered;
+
+    if (users.isEmpty) {
+      return EmptyState(
+        icon: _regFilter == 'unregister'
+            ? LucideIcons.checkCircle
+            : LucideIcons.users,
+        title: _regFilter == 'unregister'
+            ? 'All faces registered!'
+            : 'No users found',
+        subtitle: _regFilter == 'unregister'
+            ? 'Every user has face photos enrolled.'
+            : 'Try a different search or filter.',
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _loadUsers,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        itemCount: users.length,
+        separatorBuilder: (_, sep) => const SizedBox(height: 10),
+        itemBuilder: (_, i) => _userCard(users[i]),
+      ),
+    );
+  }
+
+  // ── Registration pill ──────────────────────────────────────────────────────
+  Widget _regPill({
+    required String label,
+    required IconData icon,
+    required String value,
+    required Color activeColor,
+    required Color bg,
+  }) {
+    final active = _regFilter == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _regFilter = active ? 'all' : value;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? activeColor : bg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: active
+                ? activeColor
+                : activeColor.withValues(alpha: 0.35),
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 13,
+                color: active ? Colors.white : activeColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(
+                color: active ? Colors.white : activeColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Department chip ────────────────────────────────────────────────────────
+  Widget _deptChip(String label) {
+    final selected = _deptFilter == label;
     return InkWell(
-      onTap: () => setState(() => _filter = label),
+      onTap: () {
+        setState(() {
+          _deptFilter = label;
+          if (label == 'All') {
+            _regFilter = 'all';
+          }
+        });
+      },
       borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(8),
@@ -148,31 +372,116 @@ class _UserListScreenState extends State<UserListScreen> {
     );
   }
 
-  Widget _userCard(Student s) {
+  // ── User card ──────────────────────────────────────────────────────────────
+  Widget _userCard(ApiUser u) {
+    final registered = u.isRegistered;
+
     return AppCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => StudentDetailScreen(student: s),
-        ),
-      ),
       child: Row(
         children: [
-          UserAvatar(name: s.name, size: 40),
+          // Avatar circle
+          _Avatar(initials: u.initials),
           const SizedBox(width: 12),
+
+          // Name + ID
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(s.name, style: AppTextStyles.bodyStrong),
-                const SizedBox(height: 2),
-                Text('${s.rollNumber} · ${s.department}',
-                    style: AppTextStyles.caption),
+                Text(u.fullName, style: AppTextStyles.bodyStrong),
+                if (u.department != null && u.department!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    u.department!,
+                    style: AppTextStyles.caption,
+                  ),
+                ],
               ],
             ),
           ),
+
+          // Face badge
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: registered
+                  ? AppColors.successBg
+                  : AppColors.warningBg,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  registered
+                      ? LucideIcons.scanFace
+                      : LucideIcons.alertTriangle,
+                  size: 12,
+                  color: registered
+                      ? AppColors.success
+                      : AppColors.warning,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  registered
+                      ? (u.faceCount != null
+                          ? '${u.faceCount} photos'
+                          : 'Registered')
+                      : 'No face',
+                  style: AppTextStyles.label.copyWith(
+                    color: registered
+                        ? AppColors.success
+                        : AppColors.warning,
+                    fontSize: 10.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
           const Icon(LucideIcons.chevronRight,
               size: 18, color: AppColors.textMuted),
         ],
+      ),
+    );
+  }
+}
+
+// ── Avatar widget ──────────────────────────────────────────────────────────────
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.initials});
+  final String initials;
+
+  static const _palette = [
+    Color(0xFF2E5C8A),
+    Color(0xFF1B7A5E),
+    Color(0xFF7C3AED),
+    Color(0xFFB45309),
+    Color(0xFFBE185D),
+    Color(0xFF0369A1),
+  ];
+
+  Color get _color =>
+      _palette[initials.codeUnitAt(0) % _palette.length];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: _color,
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

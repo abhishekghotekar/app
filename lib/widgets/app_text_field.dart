@@ -19,6 +19,8 @@ class AppTextField extends StatelessWidget {
     this.enabled = true,
     this.onTap,
     this.readOnly = false,
+    this.focusNode,
+    this.onChanged,
   });
 
   final String? label;
@@ -33,6 +35,8 @@ class AppTextField extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onTap;
   final bool readOnly;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +48,7 @@ class AppTextField extends StatelessWidget {
           const SizedBox(height: 6),
         ],
         TextFormField(
+          focusNode: focusNode,
           controller: controller,
           obscureText: obscure,
           validator: validator,
@@ -52,6 +57,7 @@ class AppTextField extends StatelessWidget {
           enabled: enabled,
           readOnly: readOnly,
           onTap: onTap,
+          onChanged: onChanged,
           style: AppTextStyles.body,
           cursorColor: AppColors.primary,
           decoration: InputDecoration(

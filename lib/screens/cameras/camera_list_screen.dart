@@ -3,6 +3,7 @@ import '../../theme/app_icons.dart';
 
 import '../../data/mock_data.dart';
 import '../../models/camera.dart';
+import '../../services/face_register_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_card.dart';
@@ -21,7 +22,7 @@ class CameraListScreen extends StatefulWidget {
 }
 
 class _CameraListScreenState extends State<CameraListScreen> {
-  final List<CameraModel> _cameras = List.of(MockData.cameras);
+  List<CameraModel> get _cameras => MockData.cameras;
 
   void _addCamera() {
     Navigator.of(context).push(
@@ -32,31 +33,16 @@ class _CameraListScreenState extends State<CameraListScreen> {
   @override
   Widget build(BuildContext context) {
     if (_cameras.isEmpty) {
-      return EmptyState(
+      return const EmptyState(
         icon: LucideIcons.video,
         title: 'No cameras yet',
-        subtitle: 'Add your first IP camera to start tracking attendance.',
-        actionLabel: 'Add Camera',
-        onAction: _addCamera,
+        subtitle: 'Cameras will show up here.',
       );
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('${_cameras.length} cameras', style: AppTextStyles.caption),
-            SecondaryButton(
-              label: 'Add Camera',
-              icon: LucideIcons.plus,
-              fullWidth: false,
-              onPressed: _addCamera,
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
         for (final cam in _cameras) ...[
           _cameraCard(cam),
           const SizedBox(height: 12),
@@ -68,7 +54,9 @@ class _CameraListScreenState extends State<CameraListScreen> {
   Widget _cameraCard(CameraModel cam) {
     return AppCard(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => CameraSettingsScreen(camera: cam)),
+        MaterialPageRoute(
+          builder: (_) => LiveCameraViewScreen(camera: cam),
+        ),
       ),
       child: Row(
         children: [
@@ -93,16 +81,6 @@ class _CameraListScreenState extends State<CameraListScreen> {
                 Text(cam.name, style: AppTextStyles.bodyStrong),
                 const SizedBox(height: 2),
                 Text(cam.location, style: AppTextStyles.caption),
-                const SizedBox(height: 2),
-                Text(
-                  cam.rtspUrl,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                    fontSize: 11,
-                    color: AppColors.textMuted,
-                  ),
-                ),
               ],
             ),
           ),

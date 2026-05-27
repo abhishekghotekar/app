@@ -45,6 +45,7 @@ dependencies:
   flutter_blue_classic: ^0.0.5
   wifi_scan: ^0.4.0
   image_picker: ^1.1.2
+  camera: ^0.10.6
 
 dev_dependencies:
   flutter_test:

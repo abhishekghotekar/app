@@ -505,30 +505,49 @@ class BleService {
   }
 
   /// Write only the user's access token to the device when requested.
+  ///
+  /// The BLE characteristic does NOT support long writes (max: 512 bytes).
+  /// We send a single compact JSON `{"token":"..."}` and, if the token
+  /// exceeds 400 chars, split it into sequential chunks.
   static Future<void> sendToken(
     ScannedDevice device, {
     required String token,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
-    final formats = [
-      {'token': token},
-      {'access_token': token},
-      {'accessToken': token},
-    ];
+    const chunkSize = 400; // safe margin under 512-byte MTU
 
-    for (final map in formats) {
-      final jsonStr = jsonEncode(map);
-      _log('Sending token format JSON: $jsonStr');
-      final payload = utf8.encode(jsonStr);
+    if (token.length <= chunkSize) {
+      final jsonStr = jsonEncode({'token': token});
+      _log('Sending token (${jsonStr.length} B)');
       try {
-        await char.write(payload);
-        // Small delay to let the device process the write
-        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await char.write(utf8.encode(jsonStr));
+        _log('Token sent successfully.');
       } catch (e) {
         throw BleException('Could not send token: $e');
       }
+    } else {
+      // Token is a long JWT — split into chunks
+      _log('Token too long (${token.length} chars) — chunking.');
+      final chunks = <String>[];
+      for (var i = 0; i < token.length; i += chunkSize) {
+        chunks.add(token.substring(i, (i + chunkSize).clamp(0, token.length)));
+      }
+      for (var i = 0; i < chunks.length; i++) {
+        final jsonStr = jsonEncode({
+          'token_chunk': chunks[i],
+          'chunk': i,
+          'total': chunks.length,
+        });
+        _log('Token chunk ${i + 1}/${chunks.length} (${jsonStr.length} B)');
+        try {
+          await char.write(utf8.encode(jsonStr));
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+        } catch (e) {
+          throw BleException('Could not send token chunk ${i + 1}: $e');
+        }
+      }
+      _log('All token chunks sent.');
     }
-    _log('Token formats successfully sent over BLE.');
   }
 
   /// Subscribe to status notifications from the device. Always subscribe

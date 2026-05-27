@@ -4,6 +4,7 @@ import '../../theme/app_icons.dart';
 import '../../models/camera.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/mjpeg_stream_player.dart';
 
 class LiveCameraViewScreen extends StatelessWidget {
   const LiveCameraViewScreen({super.key, required this.camera});
@@ -33,21 +34,11 @@ class LiveCameraViewScreen extends StatelessWidget {
             AspectRatio(
               aspectRatio: 16 / 9,
               child: Container(
-                color: AppColors.surfaceAlt,
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(LucideIcons.videoOff,
-                        size: 44, color: AppColors.textMuted),
-                    SizedBox(height: 10),
-                    Text(
-                      'Live preview unavailable in demo',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                color: Colors.black,
+                child: MjpegStreamPlayer(
+                  url: camera.rtspUrl,
+                  headers: const {'ngrok-skip-browser-warning': 'true'},
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
