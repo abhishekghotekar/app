@@ -9,17 +9,50 @@ import 'face_register_api.dart';
 ///
 /// Endpoint: GET /face/client/{clientId}/users
 /// Params  : page, limit, status, registration_status
+///
+/// Results are cached in memory after the first successful fetch.
+/// Call [invalidateCache] to force a fresh network request.
 class UserListApi {
   UserListApi._();
 
+  // ── Static cache ───────────────────────────────────────────────────────────
+  static List<ApiUser>? _cachedUsers;
+
+  /// True when user list is already cached in memory (no network needed).
+  static bool get isCached => _cachedUsers != null;
+
+  /// Clears the cached user list so the next [fetchUsers] call hits the network.
+  static void invalidateCache() => _cachedUsers = null;
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
   /// [registrationStatus] → 'register' | 'unregister' | null (all)
   /// [status]            → 'active' | 'inactive' | null (all)
+  ///
+  /// If [forceRefresh] is false (default) and data is already cached,
+  /// returns the cache immediately without hitting the network.
   static Future<ApiUserPage> fetchUsers({
     String? registrationStatus, // 'register' | 'unregister' | null
     String status = 'active',
     int page = 1,
     int limit = 100,
+    bool forceRefresh = false,
   }) async {
+    // Return cache if available and no filter overrides are active
+    final useCache = !forceRefresh &&
+        registrationStatus == null &&
+        status == 'active' &&
+        page == 1 &&
+        limit == 100;
+
+    if (useCache && _cachedUsers != null) {
+      return ApiUserPage(
+        users: _cachedUsers!,
+        total: _cachedUsers!.length,
+        page: 1,
+        limit: _cachedUsers!.length,
+      );
+    }
+
     final queryParams = <String, String>{
       'page': '$page',
       'limit': '$limit',
@@ -38,7 +71,7 @@ class UserListApi {
         uri,
         headers: {
           'accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true', // skip ngrok interstitial page
+          'ngrok-skip-browser-warning': 'true',
         },
       ).timeout(const Duration(seconds: 20));
     } catch (e) {
@@ -49,17 +82,22 @@ class UserListApi {
       try {
         final decoded = jsonDecode(response.body);
 
+        ApiUserPage page0;
+
         // Handle bare list response
         if (decoded is List) {
-          return ApiUserPage.fromList(decoded);
+          page0 = ApiUserPage.fromList(decoded);
+        } else if (decoded is Map<String, dynamic>) {
+          // Handle object response {data:[...]} or {users:[...]}
+          page0 = ApiUserPage.fromJson(decoded);
+        } else {
+          page0 = const ApiUserPage(users: [], total: 0, page: 1, limit: 100);
         }
 
-        // Handle object response {data:[...]} or {users:[...]}
-        if (decoded is Map<String, dynamic>) {
-          return ApiUserPage.fromJson(decoded);
-        }
+        // Store in cache only for the default (unfiltered) call
+        if (useCache) _cachedUsers = page0.users;
 
-        return const ApiUserPage(users: [], total: 0, page: 1, limit: 100);
+        return page0;
       } catch (e) {
         throw UserListException('Failed to parse response: $e');
       }

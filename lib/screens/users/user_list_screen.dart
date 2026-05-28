@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/api_user.dart';
+import '../../services/face_register_api.dart';
 import '../../services/user_list_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_icons.dart';
@@ -95,7 +96,6 @@ class _UserListScreenState extends State<UserListScreen> {
       final q = _query.toLowerCase();
       if (q.isEmpty) return true;
       return u.fullName.toLowerCase().contains(q) ||
-             u.employeeId.toLowerCase().contains(q) ||
              (u.department ?? '').toLowerCase().contains(q);
     }).toList();
   }
@@ -106,6 +106,192 @@ class _UserListScreenState extends State<UserListScreen> {
       MaterialPageRoute(builder: (_) => const AddUserScreen()),
     );
     // Refresh silently after returning from add screen
+    _loadUsers(silent: true);
+  }
+
+  // ── Unregister All ────────────────────────────────────────────────────────
+  Future<void> _unregisterAll() async {
+    // Confirm dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(LucideIcons.alertTriangle,
+                color: AppColors.danger, size: 22),
+            const SizedBox(width: 8),
+            Text('Unregister All', style: AppTextStyles.bodyStrong),
+          ],
+        ),
+        content: Text(
+          'This will delete face data for ALL active users.\nThis action cannot be undone.',
+          style: AppTextStyles.caption,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Unregister All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    // Progress bottom sheet
+    int _done = 0;
+    int _total = 0;
+    String? _lastError;
+    bool _started = false;
+    bool _finished = false;
+    UnregisterAllResult? _result;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (_, setSheet) {
+            // Kick off the operation only once
+            if (!_started) {
+              _started = true;
+              FaceRegisterApi.unregisterAll(
+                onProgress: (done, total, error) {
+                  setSheet(() {
+                    _done = done;
+                    _total = total;
+                    _lastError = error;
+                  });
+                },
+              ).then((result) {
+                setSheet(() {
+                  _result = result;
+                  _finished = true;
+                });
+              }).catchError((e) {
+                setSheet(() {
+                  _lastError = e.toString();
+                  _finished = true;
+                });
+              });
+            }
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+
+                  if (!_finished) ...[
+                    // In-progress
+                    Text(
+                      'Unregistering users…',
+                      style: AppTextStyles.bodyStrong,
+                    ),
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(
+                      value: _total > 0 ? _done / _total : null,
+                      backgroundColor: AppColors.border,
+                      color: AppColors.primary,
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _total == 0
+                          ? 'Fetching user list…'
+                          : '$_done / $_total users processed',
+                      style: AppTextStyles.caption,
+                    ),
+                    if (_lastError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '⚠ $_lastError',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.warning),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ] else ...[
+                    // Done
+                    Icon(
+                      _result != null && _result!.failed == 0
+                          ? LucideIcons.checkCircle
+                          : LucideIcons.alertCircle,
+                      size: 48,
+                      color: _result != null && _result!.failed == 0
+                          ? AppColors.success
+                          : AppColors.warning,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      _result != null
+                          ? '${_result!.succeeded} / ${_result!.total} unregistered'
+                          : _lastError ?? 'Unknown error',
+                      style: AppTextStyles.bodyStrong,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_result != null && _result!.hasErrors) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '${_result!.failed} failed — check logs',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.warning),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () => Navigator.of(sheetCtx).pop(),
+                        child: const Text('Done'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    // Refresh the list after closing
     _loadUsers(silent: true);
   }
 
@@ -130,12 +316,36 @@ class _UserListScreenState extends State<UserListScreen> {
                       controller: _search,
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   SecondaryButton(
                     label: 'Add',
                     icon: LucideIcons.plus,
                     fullWidth: false,
                     onPressed: _addUser,
+                  ),
+                  const SizedBox(width: 6),
+                  // Unregister-all button
+                  Tooltip(
+                    message: 'Unregister all users',
+                    child: InkWell(
+                      onTap: _loading ? null : _unregisterAll,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.danger.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: const Icon(
+                          LucideIcons.userX,
+                          size: 18,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),

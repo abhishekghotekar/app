@@ -22,8 +22,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'taskdesk11@gmail.com');
-  final _password = TextEditingController(text: 'Sanika@123');
+  final _email = TextEditingController(text: 'sauravrajput@gmail.com');
+  final _password = TextEditingController(text: 'Saurav@99');
   bool _obscure = true;
   bool _loading = false;
 
@@ -48,9 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthStorage.saveSession(result);
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const BleScanScreen()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const BleScanScreen()));
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -73,24 +73,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _skipToApp() async {
-    await AuthStorage.saveSession(LoginResult(
-      accessToken: 'mock_access_token_from_skip_login',
-      refreshToken: 'mock_refresh_token',
-      publicToken: 'mock_public_token',
-      expiresIn: 3600,
-      user: const AuthUser(
-        id: 'mock_user_id',
-        firstName: 'Developer',
-        lastName: 'User',
-        email: 'dev@example.com',
-        phone: '1234567890',
-        status: 'active',
+    await AuthStorage.saveSession(
+      LoginResult(
+        accessToken: 'mock_access_token_from_skip_login',
+        refreshToken: 'mock_refresh_token',
+        publicToken: 'mock_public_token',
+        expiresIn: 3600,
+        user: const AuthUser(
+          id: 'mock_user_id',
+          firstName: 'Developer',
+          lastName: 'User',
+          email: 'dev@example.com',
+          phone: '1234567890',
+          status: 'active',
+        ),
       ),
-    ));
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
   }
 
   @override
@@ -103,8 +105,10 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  minHeight:
-                      (constraints.maxHeight - 40).clamp(0.0, double.infinity),
+                  minHeight: (constraints.maxHeight - 40).clamp(
+                    0.0,
+                    double.infinity,
+                  ),
                 ),
                 child: IntrinsicHeight(
                   child: Column(
@@ -117,11 +121,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: AppColors.primary,
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(LucideIcons.scanFace,
-                            color: Colors.white, size: 32),
+                        child: const Icon(
+                          LucideIcons.scanFace,
+                          color: Colors.white,
+                          size: 32,
+                        ),
                       ),
                       const SizedBox(height: 16),
-                      Text('CVAI', style: AppTextStyles.headline.copyWith(fontSize: 28)),
+                      Text(
+                        'CVAI',
+                        style: AppTextStyles.headline.copyWith(fontSize: 28),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         'AI Attendance, made effortless.',

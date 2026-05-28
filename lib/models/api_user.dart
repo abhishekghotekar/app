@@ -3,7 +3,6 @@
 class ApiUser {
   const ApiUser({
     required this.id,
-    required this.employeeId,
     required this.clientId,
     required this.fullName,
     required this.status,
@@ -16,7 +15,6 @@ class ApiUser {
   });
 
   final String id;
-  final String employeeId;
   final String clientId;
   final String fullName;
   final String status;              // "active" | "inactive"
@@ -53,16 +51,11 @@ class ApiUser {
       }
     }
 
-    String? parsedEmployeeId;
     String? parsedClientId;
     final mappings = json['user_mappings'];
     if (mappings is List && mappings.isNotEmpty) {
       final first = mappings.first;
       if (first is Map<String, dynamic>) {
-        final empId = first['employee_id'];
-        if (empId != null && empId.toString().trim().toLowerCase() != 'null') {
-          parsedEmployeeId = empId.toString();
-        }
         final cliId = first['client_id'];
         if (cliId != null && cliId.toString().trim().toLowerCase() != 'null') {
           parsedClientId = cliId.toString();
@@ -74,8 +67,7 @@ class ApiUser {
 
     return ApiUser(
       id:                 finalId,
-      employeeId:         parsedEmployeeId ?? _str(json, ['employee_id', 'employeeId', 'roll_number']) ?? finalId,
-      clientId:           parsedClientId ?? _str(json, ['client_id', 'clientId']) ?? '6cf65b7d-5400-4c84-a56d-c7bad2e3b79d',
+      clientId:           parsedClientId ?? _str(json, ['client_id', 'clientId']) ?? 'edb3ac03-5d77-45ac-a187-794ae63f1ef4',
       fullName:           _str(json, ['full_name', 'fullName', 'name']) ?? 'Unknown',
       status:             _str(json, ['status']) ?? 'active',
       registrationStatus: _str(json, ['registration_status', 'registrationStatus']) ?? 'unregistered',

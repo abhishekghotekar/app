@@ -25,7 +25,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameCtrl     = TextEditingController();
-  final _userIdCtrl   = TextEditingController(); // employee_id
+  final _userIdCtrl   = TextEditingController(); // user id (UUID)
   final _clientIdCtrl = TextEditingController(
       text: FaceRegisterApi.clientId);
   final _emailCtrl    = TextEditingController();
@@ -35,7 +35,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
   bool _saving = false;
 
   List<ApiUser> _availableUsers = [];
-  bool _loadingUsers = true;
+  bool _loadingUsers = !UserListApi.isCached; // false if cache already warm
   String? _loadingError;
   ApiUser? _selectedUser;
 
@@ -45,9 +45,18 @@ class _AddUserScreenState extends State<AddUserScreen> {
     _fetchUsers();
   }
 
-  Future<void> _fetchUsers() async {
+  Future<void> _fetchUsers({bool forceRefresh = false}) async {
+    // If cache is already warm, skip the loading spinner entirely
+    final hasCached = !forceRefresh && UserListApi.isCached;
+    if (!hasCached) {
+      setState(() {
+        _loadingUsers = true;
+        _loadingError = null;
+      });
+    }
+
     try {
-      final res = await UserListApi.fetchUsers();
+      final res = await UserListApi.fetchUsers(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
           _availableUsers = res.users;
@@ -108,23 +117,28 @@ class _AddUserScreenState extends State<AddUserScreen> {
       return;
     }
 
-    final employeeId = user.id.isNotEmpty
-        ? user.id.trim()
-        : user.employeeId.trim();
+    // Use exactly what the backend sent — user.id and user.clientId.
+    final employeeId = user.id.trim();
     final clientId   = user.clientId.trim().isNotEmpty
         ? user.clientId.trim()
         : FaceRegisterApi.clientId;
 
+    if (employeeId.isEmpty) {
+      _snack('User ID is missing. Cannot register.', isError: true);
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       await FaceRegisterApi.register(
-        employeeId:  employeeId,
+        userId:      employeeId,
         clientId:    clientId,
         fullName:    user.fullName.trim(),
         imageFiles:  _capturedPhotos,
       );
 
       if (!mounted) return;
+      UserListApi.invalidateCache(); // force fresh list next time
       _snack('User registered successfully!', isError: false);
       await Future<void>.delayed(const Duration(milliseconds: 900));
       if (mounted) Navigator.of(context).pop();
@@ -276,7 +290,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                       setState(() {
                         _selectedUser = selection;
                         _nameCtrl.text = selection.fullName;
-                        _userIdCtrl.text = selection.employeeId;
+                        _userIdCtrl.text = selection.id;
                         _clientIdCtrl.text = selection.clientId;
                       });
                       FocusScope.of(context).unfocus();
@@ -411,7 +425,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                'ID: ${option.employeeId} · ${option.department ?? "No Dept"}',
+                                                'ID: ${option.id} · ${option.department ?? "No Dept"}',
                                                 style: AppTextStyles.caption.copyWith(
                                                   fontSize: 11,
                                                 ),
@@ -487,9 +501,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                         _infoRow(
                           icon: LucideIcons.hash,
                           label: 'User ID',
-                          value: _selectedUser!.id.isNotEmpty
-                              ? _selectedUser!.id
-                              : _selectedUser!.employeeId,
+                          value: _selectedUser!.id,
                         ),
                         const SizedBox(height: 6),
                         _infoRow(
