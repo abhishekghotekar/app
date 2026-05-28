@@ -195,7 +195,7 @@ class _DashboardTabState extends State<DashboardTab> {
 
   Widget _quickStats() {
     final presentToday = _records
-        .where((r) => r.status == AttendanceStatus.present || r.status == AttendanceStatus.late)
+        .where((r) => r.status == AttendanceStatus.present || r.status == AttendanceStatus.late || r.status == AttendanceStatus.working)
         .length;
     final absentToday = _records.where((r) => r.status == AttendanceStatus.absent).length;
     final lateToday = _records.where((r) => r.status == AttendanceStatus.late).length;
@@ -404,7 +404,9 @@ class _DashboardTabState extends State<DashboardTab> {
                 ? StatusPillType.success
                 : r.status == AttendanceStatus.late
                     ? StatusPillType.warning
-                    : StatusPillType.danger,
+                    : r.status == AttendanceStatus.absent
+                        ? StatusPillType.danger
+                        : StatusPillType.info,
           ),
         ],
       ),

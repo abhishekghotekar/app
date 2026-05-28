@@ -24,15 +24,13 @@ class AttendanceListScreen extends StatefulWidget {
 
 class _AttendanceListScreenState extends State<AttendanceListScreen> {
   DateTime _date = MockData.today;
-  int _statusTab = 0; // 0 All, 1 Present, 2 Absent, 3 Late
-  String _deptFilter = 'All';
+  int _statusTab = 0; // 0 All, 1 Working, 2 Present, 3 Absent, 4 Late
 
   List<AttendanceRecord> _records = [];
   bool _loading = true;
   String? _error;
 
-  static const _tabs = ['All', 'Present', 'Absent', 'Late'];
-  static const _depts = ['All', 'CSE', 'ECE', 'Mech', 'Faculty'];
+  static const _tabs = ['All', 'Working', 'Present', 'Absent', 'Late'];
 
   @override
   void initState() {
@@ -68,13 +66,13 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
   List<AttendanceRecord> get _filtered {
     return _records.where((r) {
       final statusOk = switch (_statusTab) {
-        1 => r.status == AttendanceStatus.present,
-        2 => r.status == AttendanceStatus.absent,
-        3 => r.status == AttendanceStatus.late,
+        1 => r.status == AttendanceStatus.working,
+        2 => r.status == AttendanceStatus.present,
+        3 => r.status == AttendanceStatus.absent,
+        4 => r.status == AttendanceStatus.late,
         _ => true,
       };
-      final deptOk = _deptFilter == 'All' || r.department.toLowerCase() == _deptFilter.toLowerCase();
-      return statusOk && deptOk;
+      return statusOk;
     }).toList();
   }
 
@@ -145,20 +143,6 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: 32,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _depts.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => _chip(
-                    _depts[i],
-                    _deptFilter == _depts[i],
-                    () => setState(() => _deptFilter = _depts[i]),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
               Row(
                 children: [
                   for (var i = 0; i < _tabs.length; i++) ...[
@@ -255,27 +239,7 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
     );
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.caption.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Widget _statusChip(String label, int index) {
     final selected = _statusTab == index;
@@ -347,6 +311,7 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
               AttendanceStatus.present => StatusPillType.success,
               AttendanceStatus.late => StatusPillType.warning,
               AttendanceStatus.absent => StatusPillType.danger,
+              AttendanceStatus.working => StatusPillType.info,
             },
           ),
         ],

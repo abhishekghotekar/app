@@ -24,7 +24,6 @@ class _UserListScreenState extends State<UserListScreen> {
   final _search = TextEditingController();
   String _query      = '';
   String _regFilter  = 'all'; // 'all' | 'register' | 'unregister'
-  String _deptFilter = 'All'; // 'All' | 'CSE' | 'ECE' | ...
 
   List<ApiUser> _allUsers  = [];
   bool   _loading = false;
@@ -33,8 +32,6 @@ class _UserListScreenState extends State<UserListScreen> {
 
   int _registeredCount = 0;
   int _unregisteredCount = 0;
-
-  static const _deptFilters = ['All', 'CSE', 'ECE', 'Mech', 'Faculty', 'Admin'];
 
   @override
   void initState() {
@@ -85,12 +82,6 @@ class _UserListScreenState extends State<UserListScreen> {
       // Registration filter (server already filtered, keeping it is safe)
       if (_regFilter == 'register'   && !u.isRegistered) return false;
       if (_regFilter == 'unregister' && u.isRegistered)  return false;
-
-      // Department filter
-      if (_deptFilter != 'All') {
-        final dept = (u.department ?? '').toLowerCase();
-        if (dept != _deptFilter.toLowerCase()) return false;
-      }
 
       // Search
       final q = _query.toLowerCase();
@@ -355,55 +346,39 @@ class _UserListScreenState extends State<UserListScreen> {
               if (!_firstLoad)
                 Row(
                   children: [
-                    _regPill(
-                      label: '$_registeredCount Registered',
-                      icon: LucideIcons.checkCircle,
-                      value: 'register',
-                      activeColor: AppColors.success,
-                      bg: AppColors.successBg,
-                    ),
-                    const SizedBox(width: 8),
-                    _regPill(
-                      label: '$_unregisteredCount Unregistered',
-                      icon: LucideIcons.alertCircle,
-                      value: 'unregister',
-                      activeColor: AppColors.warning,
-                      bg: AppColors.warningBg,
-                    ),
-                    const Spacer(),
-                    // Refresh button
-                    InkWell(
-                      onTap: _loading ? null : _loadUsers,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: _loading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.textMuted,
-                                ),
-                              )
-                            : const Icon(LucideIcons.refresh,
-                                size: 18, color: AppColors.textMuted),
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _regPill(
+                            label: 'All (${_registeredCount + _unregisteredCount})',
+                            icon: LucideIcons.users,
+                            value: 'all',
+                            activeColor: AppColors.primary,
+                            bg: AppColors.primary.withValues(alpha: 0.1),
+                          ),
+                          _regPill(
+                            label: '$_registeredCount Registered',
+                            icon: LucideIcons.checkCircle,
+                            value: 'register',
+                            activeColor: AppColors.success,
+                            bg: AppColors.successBg,
+                          ),
+                          _regPill(
+                            label: '$_unregisteredCount Unregistered',
+                            icon: LucideIcons.alertCircle,
+                            value: 'unregister',
+                            activeColor: AppColors.warning,
+                            bg: AppColors.warningBg,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               const SizedBox(height: 10),
-
-              // Department chips
-              SizedBox(
-                height: 32,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _deptFilters.length,
-                  separatorBuilder: (_, sep) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) => _deptChip(_deptFilters[i]),
-                ),
-              ),
               const SizedBox(height: 4),
             ],
           ),
@@ -544,39 +519,6 @@ class _UserListScreenState extends State<UserListScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  // ── Department chip ────────────────────────────────────────────────────────
-  Widget _deptChip(String label) {
-    final selected = _deptFilter == label;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _deptFilter = label;
-          if (label == 'All') {
-            _regFilter = 'all';
-          }
-        });
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.caption.copyWith(
-            color: selected ? Colors.white : AppColors.textSecondary,
-          ),
         ),
       ),
     );

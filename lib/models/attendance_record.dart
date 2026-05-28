@@ -1,4 +1,4 @@
-enum AttendanceStatus { present, absent, late }
+enum AttendanceStatus { present, absent, late, working }
 
 extension AttendanceStatusX on AttendanceStatus {
   String get label {
@@ -9,6 +9,8 @@ extension AttendanceStatusX on AttendanceStatus {
         return 'Absent';
       case AttendanceStatus.late:
         return 'Late';
+      case AttendanceStatus.working:
+        return 'Working';
     }
   }
 }
@@ -52,13 +54,19 @@ class AttendanceRecord {
     AttendanceStatus status = AttendanceStatus.absent;
     if (apiStatus == 'P') {
       status = isLate ? AttendanceStatus.late : AttendanceStatus.present;
+    } else if (apiStatus == 'W') {
+      status = AttendanceStatus.working;
     }
 
     final dateStr = json['date_in_iso_format']?.toString() ?? '';
     DateTime parsedDate = DateTime.now();
     if (dateStr.isNotEmpty) {
       try {
-        parsedDate = DateTime.parse(dateStr);
+        String formattedStr = dateStr;
+        if (!formattedStr.contains('Z') && !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
+          formattedStr += 'Z';
+        }
+        parsedDate = DateTime.parse(formattedStr).toLocal();
       } catch (_) {}
     }
 
@@ -66,7 +74,11 @@ class AttendanceRecord {
     DateTime? parsedInTime;
     if (inTimeStr.isNotEmpty) {
       try {
-        parsedInTime = DateTime.parse(inTimeStr);
+        String formattedStr = inTimeStr;
+        if (!formattedStr.contains('Z') && !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
+          formattedStr += 'Z';
+        }
+        parsedInTime = DateTime.parse(formattedStr).toLocal();
       } catch (_) {}
     }
 
