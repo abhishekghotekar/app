@@ -41,12 +41,14 @@ class AttendanceRecord {
     final user = json['user'] as Map<String, dynamic>? ?? const {};
     final firstName = user['first_name']?.toString() ?? '';
     final lastName = user['last_name']?.toString() ?? '';
-    final fullName = '$firstName $lastName'.trim().isNotEmpty 
-        ? '$firstName $lastName'.trim() 
+    final fullName = '$firstName $lastName'.trim().isNotEmpty
+        ? '$firstName $lastName'.trim()
         : 'Unknown';
 
     final deptObj = user['department'] as Map<String, dynamic>?;
-    final deptName = deptObj != null ? (deptObj['name']?.toString() ?? 'General') : 'General';
+    final deptName = deptObj != null
+        ? (deptObj['name']?.toString() ?? 'General')
+        : 'General';
 
     final apiStatus = json['status']?.toString() ?? 'A';
     final isLate = json['is_late'] as bool? ?? false;
@@ -63,7 +65,8 @@ class AttendanceRecord {
     if (dateStr.isNotEmpty) {
       try {
         String formattedStr = dateStr;
-        if (!formattedStr.contains('Z') && !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
+        if (!formattedStr.contains('Z') &&
+            !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
           formattedStr += 'Z';
         }
         parsedDate = DateTime.parse(formattedStr).toLocal();
@@ -75,7 +78,8 @@ class AttendanceRecord {
     if (inTimeStr.isNotEmpty) {
       try {
         String formattedStr = inTimeStr;
-        if (!formattedStr.contains('Z') && !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
+        if (!formattedStr.contains('Z') &&
+            !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
           formattedStr += 'Z';
         }
         parsedInTime = DateTime.parse(formattedStr).toLocal();
@@ -84,8 +88,8 @@ class AttendanceRecord {
 
     final userId = user['id']?.toString() ?? json['user_id']?.toString() ?? '';
     // Use short id segment or user_availability as part of dummy employee id if needed
-    final rollNo = userId.length >= 8 
-        ? 'EMP-${userId.substring(0, 4).toUpperCase()}' 
+    final rollNo = userId.length >= 8
+        ? 'EMP-${userId.substring(0, 4).toUpperCase()}'
         : 'EMP-001';
 
     return AttendanceRecord(

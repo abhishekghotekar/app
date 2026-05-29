@@ -131,4 +131,32 @@ class AttendanceApi {
       rethrow;
     }
   }
+
+  /// Fetches all attendance records for a specific user (studentId) over the last 15 days.
+  static Future<List<AttendanceRecord>> fetchUserAttendance({
+    required String userId,
+  }) async {
+    final List<Future<List<AttendanceRecord>>> futures = [];
+    final now = DateTime.now();
+
+    // Fetch records for the last 30 days in parallel using Future.wait
+    for (int i = 0; i < 30; i++) {
+      final queryDate = now.subtract(Duration(days: i));
+      futures.add(fetchAttendance(date: queryDate).catchError((e) {
+        print('AttendanceApi: Error fetching attendance for day $i: $e');
+        return <AttendanceRecord>[];
+      }));
+    }
+
+    print('AttendanceApi: Fetching user attendance for the last 30 days in parallel...');
+    final results = await Future.wait(futures);
+    final List<AttendanceRecord> userRecords = [];
+    for (final list in results) {
+      final filtered = list.where((r) => r.studentId == userId);
+      userRecords.addAll(filtered);
+    }
+
+    print('AttendanceApi: Successfully gathered ${userRecords.length} records for user $userId across the last 30 days');
+    return userRecords;
+  }
 }

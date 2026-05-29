@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../../models/attendance_record.dart';
 import '../../models/student.dart';
+import '../../services/attendance_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_app_bar.dart';
@@ -8,25 +11,108 @@ import '../../widgets/app_card.dart';
 import '../../widgets/status_pill.dart';
 import '../../widgets/user_avatar.dart';
 
-class StudentDetailScreen extends StatelessWidget {
+class StudentDetailScreen extends StatefulWidget {
   const StudentDetailScreen({super.key, required this.student});
 
   final Student student;
 
+  @override
+  State<StudentDetailScreen> createState() => _StudentDetailScreenState();
+}
 
-  /// Mock month-grouped attendance history.
-  static const _history = <String, List<(String, StatusPillType)>>{
-    'May 2026': [
-      ('Mon, 12 May', StatusPillType.success),
-      ('Tue, 13 May', StatusPillType.warning),
-      ('Wed, 14 May', StatusPillType.success),
-    ],
-    'April 2026': [
-      ('Mon, 28 Apr', StatusPillType.success),
-      ('Tue, 29 Apr', StatusPillType.danger),
-      ('Wed, 30 Apr', StatusPillType.success),
-    ],
-  };
+class _StudentDetailScreenState extends State<StudentDetailScreen> {
+  bool _loading = true;
+  String? _error;
+
+  int _attendancePercent = 0;
+  int _presentCount = 0;
+  int _absentCount = 0;
+  int _lateCount = 0;
+
+  Map<String, List<AttendanceRecord>> _groupedHistory = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAttendanceHistory();
+  }
+  Future<void> _fetchAttendanceHistory() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final records = await AttendanceApi.fetchUserAttendance(
+        userId: widget.student.id,
+      );
+
+      // Deduplicate records by calendar day (yyyy-MM-dd)
+      final Map<String, AttendanceRecord> uniqueDays = {};
+      for (final r in records) {
+        final dayKey = DateFormat('yyyy-MM-dd').format(r.date);
+        final existing = uniqueDays[dayKey];
+        if (existing == null) {
+          uniqueDays[dayKey] = r;
+        } else {
+          // Resolve duplicate days by preferring the "better" status
+          // present / working > late > absent
+          if (r.status == AttendanceStatus.present || r.status == AttendanceStatus.working) {
+            uniqueDays[dayKey] = r;
+          } else if (r.status == AttendanceStatus.late && existing.status == AttendanceStatus.absent) {
+            uniqueDays[dayKey] = r;
+          }
+        }
+      }
+
+      final uniqueRecords = uniqueDays.values.toList();
+
+      // Calculate statistics dynamically
+      int present = 0;
+      int absent = 0;
+      int late = 0;
+      for (final r in uniqueRecords) {
+        if (r.status == AttendanceStatus.present || r.status == AttendanceStatus.working) {
+          present++;
+        } else if (r.status == AttendanceStatus.absent) {
+          absent++;
+        } else if (r.status == AttendanceStatus.late) {
+          late++;
+        }
+      }
+
+      final total = present + absent + late;
+      final percent = total > 0 ? ((present + late) * 100 ~/ total) : 0;
+
+      // Sort unique records by date descending
+      uniqueRecords.sort((a, b) => b.date.compareTo(a.date));
+
+      // Group records by month (e.g. "May 2026")
+      final Map<String, List<AttendanceRecord>> grouped = {};
+      for (final r in uniqueRecords) {
+        final monthStr = DateFormat('MMMM yyyy').format(r.date);
+        grouped.putIfAbsent(monthStr, () => []).add(r);
+      }
+
+      if (mounted) {
+        setState(() {
+          _presentCount = present;
+          _absentCount = absent;
+          _lateCount = late;
+          _attendancePercent = percent;
+          _groupedHistory = grouped;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,109 +125,164 @@ class StudentDetailScreen extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  UserAvatar(name: student.name, size: 80),
+                  UserAvatar(name: widget.student.name, size: 80),
                   const SizedBox(height: 12),
-                  Text(student.name, style: AppTextStyles.title),
+                  Text(widget.student.name, style: AppTextStyles.title),
                   const SizedBox(height: 4),
                   Text(
-                    '${student.rollNumber} · ${student.department}',
+                    '${widget.student.rollNumber} · ${widget.student.department}',
                     style: AppTextStyles.caption,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-            AppCard(
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        SizedBox(
-                          width: 64,
-                          height: 64,
-                          child: CircularProgressIndicator(
-                            value: student.attendancePercent / 100,
-                            strokeWidth: 6,
-                            backgroundColor: AppColors.surfaceAlt,
-                            valueColor: const AlwaysStoppedAnimation(
-                                AppColors.primary),
-                          ),
-                        ),
-                        Text('${student.attendancePercent}%',
-                            style: AppTextStyles.bodyStrong),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Overall attendance',
-                            style: AppTextStyles.bodyStrong),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Across all recorded sessions this year.',
-                          style: AppTextStyles.caption,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+            if (_loading) ...[
+              const SizedBox(height: 64),
+              const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _statTile('Present', student.presentCount, AppColors.success),
-                const SizedBox(width: 12),
-                _statTile('Absent', student.absentCount, AppColors.danger),
-                const SizedBox(width: 12),
-                _statTile('Late', student.lateCount, AppColors.warning),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text('Attendance history', style: AppTextStyles.sectionTitle),
-            const SizedBox(height: 12),
-            for (final entry in _history.entries) ...[
-              Text(entry.key.toUpperCase(), style: AppTextStyles.label),
-              const SizedBox(height: 8),
-              AppCard(
-                padding: EdgeInsets.zero,
+            ] else if (_error != null) ...[
+              const SizedBox(height: 48),
+              Center(
                 child: Column(
                   children: [
-                    for (var i = 0; i < entry.value.length; i++) ...[
-                      if (i > 0) const Divider(),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(entry.value[i].$1,
-                                style: AppTextStyles.body),
-                            StatusPill(
-                              label: switch (entry.value[i].$2) {
-                                StatusPillType.success => 'Present',
-                                StatusPillType.warning => 'Late',
-                                StatusPillType.danger => 'Absent',
-                                _ => '—',
-                              },
-                              type: entry.value[i].$2,
-                            ),
-                          ],
-                        ),
+                    const Icon(Icons.error_outline,
+                        color: AppColors.danger, size: 40),
+                    const SizedBox(height: 12),
+                    Text('Failed to load attendance history',
+                        style: AppTextStyles.bodyStrong),
+                    const SizedBox(height: 6),
+                    Text(
+                      _error!,
+                      style: AppTextStyles.caption,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchAttendanceHistory,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
-                    ],
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+            ] else ...[
+              AppCard(
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 64,
+                            height: 64,
+                            child: CircularProgressIndicator(
+                              value: _attendancePercent / 100,
+                              strokeWidth: 6,
+                              backgroundColor: AppColors.surfaceAlt,
+                              valueColor: const AlwaysStoppedAnimation(
+                                  AppColors.primary),
+                            ),
+                          ),
+                          Text('$_attendancePercent%',
+                              style: AppTextStyles.bodyStrong),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Overall attendance',
+                              style: AppTextStyles.bodyStrong),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Across all recorded sessions this year.',
+                            style: AppTextStyles.caption,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _statTile('Present', _presentCount, AppColors.success),
+                  const SizedBox(width: 12),
+                  _statTile('Absent', _absentCount, AppColors.danger),
+                  const SizedBox(width: 12),
+                  _statTile('Late', _lateCount, AppColors.warning),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text('Attendance history', style: AppTextStyles.sectionTitle),
+              const SizedBox(height: 12),
+              if (_groupedHistory.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      'No attendance records found.',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                )
+              else
+                for (final entry in _groupedHistory.entries) ...[
+                  Text(entry.key.toUpperCase(), style: AppTextStyles.label),
+                  const SizedBox(height: 8),
+                  AppCard(
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < entry.value.length; i++) ...[
+                          if (i > 0) const Divider(),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            child: Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat('EEE, d MMM')
+                                      .format(entry.value[i].date),
+                                  style: AppTextStyles.body,
+                                ),
+                                StatusPill(
+                                  label: entry.value[i].status.label,
+                                  type: switch (entry.value[i].status) {
+                                    AttendanceStatus.present =>
+                                      StatusPillType.success,
+                                    AttendanceStatus.late =>
+                                      StatusPillType.warning,
+                                    AttendanceStatus.absent =>
+                                      StatusPillType.danger,
+                                    AttendanceStatus.working =>
+                                      StatusPillType.info,
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
             ],
           ],
         ),

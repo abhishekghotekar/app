@@ -24,8 +24,7 @@ class FaceRegisterApi {
   FaceRegisterApi._();
 
   /// Change this to your current ngrok URL.
-  static const String baseUrl =
-      'https://mechanisms-papers-with-pocket.trycloudflare.com';
+  static const String baseUrl = 'https://baap-tunnel-13-201-117-192.nip.io';
 
   /// The client (organisation) ID for all face API calls.
   static const String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';
