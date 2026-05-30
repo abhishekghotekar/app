@@ -10,6 +10,8 @@ import '../../widgets/app_card.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/secondary_button.dart';
+import '../attendance/student_detail_screen.dart';
+import '../../models/student.dart';
 import 'add_user_screen.dart';
 
 class UserListScreen extends StatefulWidget {
@@ -505,6 +507,30 @@ class _UserListScreenState extends State<UserListScreen> {
     final registered = u.isRegistered;
 
     return AppCard(
+      onTap: registered
+          ? () {
+              final student = Student(
+                id: u.id,
+                name: u.fullName,
+                rollNumber: 'EMP-${u.id.length > 4 ? u.id.substring(0, 4) : u.id}',
+                department: u.department ?? 'General',
+                className: '',
+                role: 'Employee',
+                enrolledFaces: u.faceCount ?? 0,
+              );
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => StudentDetailScreen(student: student),
+                ),
+              );
+            }
+          : () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AddUserScreen(initialUser: u),
+                ),
+              );
+            },
       child: Row(
         children: [
           // Avatar circle

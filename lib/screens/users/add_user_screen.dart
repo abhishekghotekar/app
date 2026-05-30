@@ -15,7 +15,9 @@ import '../../models/api_user.dart';
 import '../../services/user_list_api.dart';
 
 class AddUserScreen extends StatefulWidget {
-  const AddUserScreen({super.key});
+  const AddUserScreen({super.key, this.initialUser});
+
+  final ApiUser? initialUser;
 
   @override
   State<AddUserScreen> createState() => _AddUserScreenState();
@@ -42,6 +44,12 @@ class _AddUserScreenState extends State<AddUserScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialUser != null) {
+      _selectedUser = widget.initialUser;
+      _nameCtrl.text = widget.initialUser!.fullName;
+      _userIdCtrl.text = widget.initialUser!.id;
+      _clientIdCtrl.text = widget.initialUser!.clientId;
+    }
     _fetchUsers();
   }
 
@@ -386,8 +394,14 @@ class _AddUserScreenState extends State<AddUserScreen> {
                               ),
                               itemBuilder: (BuildContext context, int index) {
                                 final ApiUser option = options.elementAt(index);
-                                return InkWell(
-                                  onTap: () => onSelected(option),
+                                  return InkWell(
+                                    onTap: () {
+                                      if (option.isRegistered) {
+                                        _snack('User is already registered!', isError: true);
+                                      } else {
+                                        onSelected(option);
+                                      }
+                                    },
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 16,
@@ -423,13 +437,15 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                                 option.fullName,
                                                 style: AppTextStyles.bodyStrong,
                                               ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                'ID: ${option.id} · ${option.department ?? "No Dept"}',
-                                                style: AppTextStyles.caption.copyWith(
-                                                  fontSize: 11,
+                                              if (option.department != null && option.department!.isNotEmpty) ...[
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  option.department!,
+                                                  style: AppTextStyles.caption.copyWith(
+                                                    fontSize: 11,
+                                                  ),
                                                 ),
-                                              ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -468,59 +484,7 @@ class _AddUserScreenState extends State<AddUserScreen> {
                   ),
                  ],
 
-                // ── Selected user ID info card ──────────────────────────────
-                if (_selectedUser != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(LucideIcons.idCard,
-                                size: 13, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            Text(
-                              'USER DETAILS',
-                              style: AppTextStyles.label.copyWith(
-                                color: AppColors.primary,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        _infoRow(
-                          icon: LucideIcons.hash,
-                          label: 'User ID',
-                          value: _selectedUser!.id,
-                        ),
-                        const SizedBox(height: 6),
-                        _infoRow(
-                          icon: LucideIcons.building2,
-                          label: 'Client ID',
-                          value: _selectedUser!.clientId,
-                        ),
-                        if (_selectedUser!.department != null) ...[
-                          const SizedBox(height: 6),
-                          _infoRow(
-                            icon: LucideIcons.layoutGrid,
-                            label: 'Department',
-                            value: _selectedUser!.department!,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
+                // User ID and Client ID info card removed as requested
                 const SizedBox(height: 28),
 
                 // ── Face Enrollment section label ─────────────────────────

@@ -129,10 +129,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                   const SizedBox(height: 12),
                   Text(widget.student.name, style: AppTextStyles.title),
                   const SizedBox(height: 4),
-                  Text(
-                    '${widget.student.rollNumber} · ${widget.student.department}',
-                    style: AppTextStyles.caption,
-                  ),
+// Subtitle removed
                 ],
               ),
             ),
