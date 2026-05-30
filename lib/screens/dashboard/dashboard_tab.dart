@@ -113,54 +113,58 @@ class _DashboardTabState extends State<DashboardTab> {
         ..sort((a, b) => b.timeIn!.compareTo(a.timeIn!));
     final recentCount = recentActivity.take(5).toList();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-      children: [
-        _greetingCard(),
-        const SizedBox(height: 24),
-        _quickStats(),
-        const SizedBox(height: 24),
-        _chartCard(),
-        const SizedBox(height: 24),
-        _deviceCard(),
-        const SizedBox(height: 24),
-        SectionHeader(
-          title: 'Recent activity',
-          actionLabel: 'See all',
-          onAction: () {},
-        ),
-        const SizedBox(height: 12),
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: recentCount.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text('No check-ins today yet.'),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (var i = 0; i < recentCount.length; i++) ...[
-                      if (i > 0) const Divider(),
-                      _activityRow(recentCount[i]),
-                    ],
-                  ],
-                ),
-        ),
-        if (_activeAlerts.isNotEmpty) ...[
+    return RefreshIndicator(
+      onRefresh: _fetchData,
+      color: AppColors.primary,
+      backgroundColor: AppColors.surface,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        children: [
+          _greetingCard(),
+          const SizedBox(height: 24),
+          _quickStats(),
+          const SizedBox(height: 24),
+          _chartCard(),
           const SizedBox(height: 24),
           SectionHeader(
-            title: 'Active alerts',
-            actionLabel: 'View all',
-            onAction: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AlertHistoryScreen()),
-            ),
+            title: 'Recent activity',
+            actionLabel: 'See all',
+            onAction: () {},
           ),
           const SizedBox(height: 12),
-          ..._activeAlerts.map(_alertCard),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: recentCount.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text('No check-ins today yet.'),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (var i = 0; i < recentCount.length; i++) ...[
+                        if (i > 0) const Divider(),
+                        _activityRow(recentCount[i]),
+                      ],
+                    ],
+                  ),
+          ),
+          if (_activeAlerts.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            SectionHeader(
+              title: 'Active alerts',
+              actionLabel: 'View all',
+              onAction: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AlertHistoryScreen()),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._activeAlerts.map(_alertCard),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -246,10 +250,55 @@ class _DashboardTabState extends State<DashboardTab> {
       '7a', '8a', '9a', '10a', '11a', '12p',
       '1p', '2p', '3p', '4p', '5p', '6p',
     ];
+
+    // Compute hourly attendance counts from active records
+    final List<double> hourlyCounts = List.filled(labels.length, 0.0);
+    for (final r in _records) {
+      if (r.timeIn != null) {
+        final hour = r.timeIn!.hour;
+        if (hour >= 7 && hour <= 18) {
+          hourlyCounts[hour - 7] += 1.0;
+        }
+      }
+    }
+
     final spots = [
-      for (var i = 0; i < MockData.hourlyAttendance.length; i++)
-        FlSpot(i.toDouble(), MockData.hourlyAttendance[i]),
+      for (var i = 0; i < hourlyCounts.length; i++)
+        FlSpot(i.toDouble(), hourlyCounts[i]),
     ];
+
+    // Dynamically calculate maxY and interval to scale beautifully
+    double maxCount = 0;
+    for (final count in hourlyCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+      }
+    }
+
+    double maxY = 10;
+    double interval = 2;
+    if (maxCount > 0) {
+      if (maxCount <= 5) {
+        maxY = 5;
+        interval = 1;
+      } else if (maxCount <= 10) {
+        maxY = 10;
+        interval = 2;
+      } else if (maxCount <= 20) {
+        maxY = 20;
+        interval = 5;
+      } else if (maxCount <= 40) {
+        maxY = 40;
+        interval = 10;
+      } else if (maxCount <= 80) {
+        maxY = 80;
+        interval = 20;
+      } else {
+        maxY = ((maxCount / 20).ceil() * 20).toDouble();
+        interval = maxY / 4;
+      }
+    }
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,11 +312,11 @@ class _DashboardTabState extends State<DashboardTab> {
             child: LineChart(
               LineChartData(
                 minY: 0,
-                maxY: 80,
+                maxY: maxY,
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 20,
+                  horizontalInterval: interval,
                   getDrawingHorizontalLine: (_) => const FlLine(
                     color: AppColors.divider,
                     strokeWidth: 1,
@@ -282,7 +331,7 @@ class _DashboardTabState extends State<DashboardTab> {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
-                      interval: 20,
+                      interval: interval,
                       reservedSize: 28,
                       getTitlesWidget: (v, _) => Text(
                         v.toInt().toString(),
@@ -333,45 +382,28 @@ class _DashboardTabState extends State<DashboardTab> {
                     ),
                   ),
                 ],
-                lineTouchData: const LineTouchData(enabled: false),
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipColor: (LineBarSpot touchedSpot) => AppColors.primary,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final hourLabel = labels[spot.x.toInt()];
+                        return LineTooltipItem(
+                          '${spot.y.toInt()} check-ins\nat $hourLabel',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _deviceCard() {
-    final d = MockData.device;
-    return AppCard(
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.infoBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(LucideIcons.cpu,
-                size: 22, color: AppColors.info),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(d.name, style: AppTextStyles.bodyStrong),
-                const SizedBox(height: 2),
-                Text(
-                  'Last sync ${d.lastSync} · ${d.activeCameras} cameras active',
-                  style: AppTextStyles.caption.copyWith(fontSize: 11.5),
-                ),
-              ],
-            ),
-          ),
-          const StatusPill(label: 'Online', type: StatusPillType.success),
         ],
       ),
     );

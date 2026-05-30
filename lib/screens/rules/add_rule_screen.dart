@@ -29,7 +29,12 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
   late Set<String> _channels = {...?widget.rule?.channels};
 
   static const _types = ['Time-based', 'Event-based'];
-  static const _targets = ['All students', 'Class 10A', 'Class 12A', 'Class 12B'];
+  static const _targets = [
+    'All students',
+    'Class 10A',
+    'Class 12A',
+    'Class 12B',
+  ];
   static const _allRecipients = ['Warden', 'Admin', 'Class teacher'];
   static const _allChannels = ['WhatsApp', 'Email', 'Push'];
 
@@ -118,9 +123,11 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
                     _selectChip(
                       r,
                       _recipients.contains(r),
-                      () => setState(() => _recipients.contains(r)
-                          ? _recipients.remove(r)
-                          : _recipients.add(r)),
+                      () => setState(
+                        () => _recipients.contains(r)
+                            ? _recipients.remove(r)
+                            : _recipients.add(r),
+                      ),
                     ),
                 ],
               ),
@@ -135,9 +142,11 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
                     _selectChip(
                       c,
                       _channels.contains(c),
-                      () => setState(() => _channels.contains(c)
-                          ? _channels.remove(c)
-                          : _channels.add(c)),
+                      () => setState(
+                        () => _channels.contains(c)
+                            ? _channels.remove(c)
+                            : _channels.add(c),
+                      ),
                     ),
                 ],
               ),
@@ -165,8 +174,7 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
     );
   }
 
-  Widget _sectionLabel(String text) =>
-      Text(text, style: AppTextStyles.label);
+  Widget _sectionLabel(String text) => Text(text, style: AppTextStyles.label);
 
   Widget _dropdown({
     required String value,
@@ -184,13 +192,15 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: const Icon(LucideIcons.chevronDown,
-              size: 18, color: AppColors.textSecondary),
+          icon: const Icon(
+            LucideIcons.chevronDown,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
           style: AppTextStyles.body,
           borderRadius: BorderRadius.circular(8),
           items: [
-            for (final i in items)
-              DropdownMenuItem(value: i, child: Text(i)),
+            for (final i in items) DropdownMenuItem(value: i, child: Text(i)),
           ],
           onChanged: (v) => v == null ? null : onChanged(v),
         ),
@@ -214,8 +224,11 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
           const Spacer(),
           Text(value, style: AppTextStyles.bodyStrong),
           const SizedBox(width: 6),
-          const Icon(LucideIcons.chevronRight,
-              size: 16, color: AppColors.textMuted),
+          const Icon(
+            LucideIcons.chevronRight,
+            size: 16,
+            color: AppColors.textMuted,
+          ),
         ],
       ),
     );
@@ -231,7 +244,8 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
           color: selected ? AppColors.infoBg : AppColors.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border),
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -245,8 +259,7 @@ class _AddRuleScreenState extends State<AddRuleScreen> {
             Text(
               label,
               style: AppTextStyles.caption.copyWith(
-                color:
-                    selected ? AppColors.primary : AppColors.textSecondary,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),

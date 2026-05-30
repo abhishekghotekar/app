@@ -256,10 +256,24 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                               mainAxisAlignment:
                                   MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  DateFormat('EEE, d MMM')
-                                      .format(entry.value[i].date),
-                                  style: AppTextStyles.body,
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      DateFormat('EEE, d MMM')
+                                          .format(entry.value[i].date),
+                                      style: AppTextStyles.bodyStrong,
+                                    ),
+                                    if (entry.value[i].timeIn != null ||
+                                        entry.value[i].timeOut != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text(
+                                          'In: ${entry.value[i].timeIn != null ? DateFormat.jm().format(entry.value[i].timeIn!) : '--'} • Out: ${entry.value[i].timeOut != null ? DateFormat.jm().format(entry.value[i].timeOut!) : '--'}',
+                                          style: AppTextStyles.caption.copyWith(fontSize: 12),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 StatusPill(
                                   label: entry.value[i].status.label,

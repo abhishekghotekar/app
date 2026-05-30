@@ -269,8 +269,15 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
   }
 
   Widget _recordCard(AttendanceRecord r) {
-    final time =
-        r.timeIn == null ? '—' : DateFormat('h:mm a').format(r.timeIn!);
+    final String label;
+    if (r.timeOut != null) {
+      label = 'Out: ${DateFormat('h:mm a').format(r.timeOut!)}';
+    } else if (r.timeIn != null) {
+      label = 'In: ${DateFormat('h:mm a').format(r.timeIn!)}';
+    } else {
+      label = 'In: —';
+    }
+
     return AppCard(
       onTap: () {
         final student = MockData.students.firstWhere(
@@ -300,7 +307,7 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
               children: [
                 Text(r.studentName, style: AppTextStyles.bodyStrong),
                 const SizedBox(height: 2),
-                Text('${r.rollNumber} · In: $time',
+                Text(label,
                     style: AppTextStyles.caption),
               ],
             ),

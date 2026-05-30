@@ -41,7 +41,7 @@ class AttendanceApi {
     required DateTime date,
     String? status, // 'P', 'A' or null (all)
     int page = 1,
-    int limit = 100,
+    int limit = 1000,
   }) async {
     final dateStr =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -115,7 +115,7 @@ class AttendanceApi {
         return data
             .map(
               (json) =>
-                  AttendanceRecord.fromApiJson(json as Map<String, dynamic>),
+                  AttendanceRecord.fromApiJson(json as Map<String, dynamic>, fallbackDate: date),
             )
             .toList();
       } else {

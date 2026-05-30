@@ -26,6 +26,7 @@ class AttendanceRecord {
     required this.status,
     required this.date,
     this.timeIn,
+    this.timeOut,
   });
 
   final String id;
@@ -36,8 +37,9 @@ class AttendanceRecord {
   final AttendanceStatus status;
   final DateTime date;
   final DateTime? timeIn;
+  final DateTime? timeOut;
 
-  factory AttendanceRecord.fromApiJson(Map<String, dynamic> json) {
+  factory AttendanceRecord.fromApiJson(Map<String, dynamic> json, {DateTime? fallbackDate}) {
     final user = json['user'] as Map<String, dynamic>? ?? const {};
     final firstName = user['first_name']?.toString() ?? '';
     final lastName = user['last_name']?.toString() ?? '';
@@ -60,8 +62,8 @@ class AttendanceRecord {
       status = AttendanceStatus.working;
     }
 
-    final dateStr = json['date_in_iso_format']?.toString() ?? '';
-    DateTime parsedDate = DateTime.now();
+    final dateStr = json['date_in_iso_format']?.toString() ?? json['date']?.toString() ?? '';
+    DateTime parsedDate = fallbackDate ?? DateTime.now();
     if (dateStr.isNotEmpty) {
       try {
         String formattedStr = dateStr;
@@ -86,6 +88,19 @@ class AttendanceRecord {
       } catch (_) {}
     }
 
+    final outTimeStr = (json['out_time'] ?? json['checkout_time'] ?? json['outTime'])?.toString() ?? '';
+    DateTime? parsedOutTime;
+    if (outTimeStr.isNotEmpty) {
+      try {
+        String formattedStr = outTimeStr;
+        if (!formattedStr.contains('Z') &&
+            !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(formattedStr)) {
+          formattedStr += 'Z';
+        }
+        parsedOutTime = DateTime.parse(formattedStr).toLocal();
+      } catch (_) {}
+    }
+
     final userId = user['id']?.toString() ?? json['user_id']?.toString() ?? '';
     // Use short id segment or user_availability as part of dummy employee id if needed
     final rollNo = userId.length >= 8
@@ -101,6 +116,7 @@ class AttendanceRecord {
       status: status,
       date: parsedDate,
       timeIn: parsedInTime,
+      timeOut: parsedOutTime,
     );
   }
 }
