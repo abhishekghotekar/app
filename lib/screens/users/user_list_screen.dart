@@ -302,7 +302,7 @@ class _UserListScreenState extends State<UserListScreen> {
                 children: [
                   Expanded(
                     child: AppTextField(
-                      hint: 'Search by name or ID',
+                      hint: 'Search by name',
                       prefixIcon: LucideIcons.search,
                       controller: _search,
                     ),
@@ -313,30 +313,6 @@ class _UserListScreenState extends State<UserListScreen> {
                     icon: LucideIcons.plus,
                     fullWidth: false,
                     onPressed: _addUser,
-                  ),
-                  const SizedBox(width: 6),
-                  // Unregister-all button
-                  Tooltip(
-                    message: 'Unregister all users',
-                    child: InkWell(
-                      onTap: _loading ? null : _unregisterAll,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppColors.danger.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: const Icon(
-                          LucideIcons.userX,
-                          size: 18,
-                          color: AppColors.danger,
-                        ),
-                      ),
-                    ),
                   ),
                 ],
               ),

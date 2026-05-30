@@ -21,12 +21,12 @@ class AttendanceApi {
       final parts = token.split('.');
       if (parts.length < 2) return null;
       String payload = parts[1];
-      
+
       int padLength = 4 - (payload.length % 4);
       if (padLength < 4) {
         payload += '=' * padLength;
       }
-      
+
       final decoded = utf8.decode(base64Url.decode(payload));
       return jsonDecode(decoded) as Map<String, dynamic>;
     } catch (e) {
@@ -39,7 +39,7 @@ class AttendanceApi {
   /// If status is null, it fetches all records.
   static Future<List<AttendanceRecord>> fetchAttendance({
     required DateTime date,
-    String? status, // 'P', 'A' or null (all)
+    String? status, // 'P', 'A' or null (all).
     int page = 1,
     int limit = 1000,
   }) async {
@@ -51,7 +51,9 @@ class AttendanceApi {
     try {
       print('AttendanceApi: Loading token from storage...');
       final sessionToken = await AuthStorage.accessToken();
-      print('AttendanceApi: Session token exists: ${sessionToken != null && sessionToken.isNotEmpty}');
+      print(
+        'AttendanceApi: Session token exists: ${sessionToken != null && sessionToken.isNotEmpty}',
+      );
       if (sessionToken != null && sessionToken.isNotEmpty) {
         token = sessionToken;
       }
@@ -114,8 +116,10 @@ class AttendanceApi {
         print('AttendanceApi: Successfully fetched ${data.length} records');
         return data
             .map(
-              (json) =>
-                  AttendanceRecord.fromApiJson(json as Map<String, dynamic>, fallbackDate: date),
+              (json) => AttendanceRecord.fromApiJson(
+                json as Map<String, dynamic>,
+                fallbackDate: date,
+              ),
             )
             .toList();
       } else {
@@ -142,13 +146,17 @@ class AttendanceApi {
     // Fetch records for the last 30 days in parallel using Future.wait
     for (int i = 0; i < 30; i++) {
       final queryDate = now.subtract(Duration(days: i));
-      futures.add(fetchAttendance(date: queryDate).catchError((e) {
-        print('AttendanceApi: Error fetching attendance for day $i: $e');
-        return <AttendanceRecord>[];
-      }));
+      futures.add(
+        fetchAttendance(date: queryDate).catchError((e) {
+          print('AttendanceApi: Error fetching attendance for day $i: $e');
+          return <AttendanceRecord>[];
+        }),
+      );
     }
 
-    print('AttendanceApi: Fetching user attendance for the last 30 days in parallel...');
+    print(
+      'AttendanceApi: Fetching user attendance for the last 30 days in parallel...',
+    );
     final results = await Future.wait(futures);
     final List<AttendanceRecord> userRecords = [];
     for (final list in results) {
@@ -156,7 +164,9 @@ class AttendanceApi {
       userRecords.addAll(filtered);
     }
 
-    print('AttendanceApi: Successfully gathered ${userRecords.length} records for user $userId across the last 30 days');
+    print(
+      'AttendanceApi: Successfully gathered ${userRecords.length} records for user $userId across the last 30 days',
+    );
     return userRecords;
   }
 }

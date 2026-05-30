@@ -30,12 +30,23 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
   bool _loading = true;
   String? _error;
 
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
+
   static const _tabs = ['All', 'Working', 'Present', 'Absent', 'Late'];
 
   @override
   void initState() {
     super.initState();
     _fetchData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchData() async {
@@ -72,7 +83,9 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
         4 => r.status == AttendanceStatus.late,
         _ => true,
       };
-      return statusOk;
+      final matchesSearch = _searchQuery.isEmpty || 
+          r.studentName.toLowerCase().contains(_searchQuery);
+      return statusOk && matchesSearch;
     }).toList();
   }
 
@@ -141,6 +154,49 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
                     );
                   }),
                 ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.trim().toLowerCase();
+                  });
+                },
+                onTapOutside: (_) => _searchFocusNode.unfocus(),
+                decoration: InputDecoration(
+                  hintText: 'Search by student name...',
+                  hintStyle: AppTextStyles.caption.copyWith(fontSize: 14),
+                  prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                  suffixIcon: _searchQuery.isNotEmpty 
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16, color: AppColors.textSecondary),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.surfaceAlt,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.primary),
+                  ),
+                ),
+                style: AppTextStyles.body,
               ),
               const SizedBox(height: 12),
               Row(
