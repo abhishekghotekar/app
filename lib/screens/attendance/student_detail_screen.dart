@@ -10,6 +10,8 @@ import '../../widgets/app_app_bar.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/status_pill.dart';
 import '../../widgets/user_avatar.dart';
+import '../../widgets/app_error_view.dart';
+
 
 class StudentDetailScreen extends StatefulWidget {
   const StudentDetailScreen({super.key, required this.student});
@@ -110,6 +112,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
           _error = e.toString();
           _loading = false;
         });
+        AppErrorView.show(context, e.toString(), onRetry: _fetchAttendanceHistory);
       }
     }
   }
@@ -140,34 +143,10 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
             ] else if (_error != null) ...[
-              const SizedBox(height: 48),
-              Center(
-                child: Column(
-                  children: [
-                    const Icon(Icons.error_outline,
-                        color: AppColors.danger, size: 40),
-                    const SizedBox(height: 12),
-                    Text('Failed to load attendance history',
-                        style: AppTextStyles.bodyStrong),
-                    const SizedBox(height: 6),
-                    Text(
-                      _error!,
-                      style: AppTextStyles.caption,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _fetchAttendanceHistory,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
+              AppErrorView(
+                error: _error!,
+                title: 'Failed to load attendance history',
+                onRetry: _fetchAttendanceHistory,
               ),
             ] else ...[
               AppCard(

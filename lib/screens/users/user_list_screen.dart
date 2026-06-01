@@ -13,6 +13,8 @@ import '../../widgets/secondary_button.dart';
 import '../attendance/student_detail_screen.dart';
 import '../../models/student.dart';
 import 'add_user_screen.dart';
+import '../../widgets/app_error_view.dart';
+
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -72,9 +74,15 @@ class _UserListScreenState extends State<UserListScreen> {
         });
       }
     } on UserListException catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.message; });
+      if (mounted) {
+        setState(() { _loading = false; _error = e.message; });
+        AppErrorView.show(context, e.message, onRetry: _loadUsers);
+      }
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+      if (mounted) {
+        setState(() { _loading = false; _error = e.toString(); });
+        AppErrorView.show(context, e.toString(), onRetry: _loadUsers);
+      }
     }
   }
 
@@ -383,45 +391,11 @@ class _UserListScreenState extends State<UserListScreen> {
       );
     }
 
-    // Error state
     if (_error != null && _allUsers.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(LucideIcons.alertCircle,
-                  size: 48, color: AppColors.danger),
-              const SizedBox(height: 16),
-              Text(
-                'Failed to load users',
-                style: AppTextStyles.bodyStrong,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: AppTextStyles.caption,
-                textAlign: TextAlign.center,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _loadUsers,
-                icon: const Icon(LucideIcons.refresh, size: 16),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return AppErrorView(
+        error: _error!,
+        title: 'Failed to load users',
+        onRetry: _loadUsers,
       );
     }
 
