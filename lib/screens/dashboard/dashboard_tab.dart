@@ -14,6 +14,8 @@ import '../../widgets/section_header.dart';
 import '../../widgets/status_pill.dart';
 import '../../widgets/user_avatar.dart';
 import '../rules/alert_history_screen.dart';
+import '../../widgets/app_error_view.dart';
+
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -57,6 +59,7 @@ class _DashboardTabState extends State<DashboardTab> {
           _error = e.toString();
           _loading = false;
         });
+        AppErrorView.show(context, e.toString(), onRetry: _fetchData);
       }
     }
   }
@@ -77,33 +80,9 @@ class _DashboardTabState extends State<DashboardTab> {
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(LucideIcons.circleAlert, color: AppColors.danger, size: 36),
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                style: AppTextStyles.caption.copyWith(color: AppColors.danger),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _fetchData,
-                icon: const Icon(LucideIcons.refreshCw, size: 14),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-            ],
-          ),
-        ),
+      return AppErrorView(
+        error: _error!,
+        onRetry: _fetchData,
       );
     }
 
@@ -182,7 +161,7 @@ class _DashboardTabState extends State<DashboardTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Good $part, Rahul 👋', style: AppTextStyles.title),
+                Text('Good $part, Abhishek 👋', style: AppTextStyles.title),
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('EEEE, d MMMM y').format(DateTime.now()),
@@ -191,7 +170,7 @@ class _DashboardTabState extends State<DashboardTab> {
               ],
             ),
           ),
-          const UserAvatar(name: 'Rahul Sharma'),
+          const UserAvatar(name: 'Abhishek'),
         ],
       ),
     );

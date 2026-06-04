@@ -21,12 +21,12 @@ class MockData {
   // --- Current user profile ----------------------------------------------
   static const Student currentUser = Student(
     id: 'u-000',
-    name: 'Rahul Sharma',
+    name: 'Abhi',
     rollNumber: 'ADM-001',
     department: 'Administration',
     className: '—',
     role: 'Admin',
-    email: 'rahul@cvai.in',
+    email: 'abhishek@cvai.in',
     phone: '+91 98200 11223',
   );
 
@@ -57,7 +57,7 @@ class MockData {
 
   static const List<String> wifiNetworks = [
     'Home_WiFi',
-    'Office_5G',
+    'GROUND ZONE 1',
     'Guest_Network',
   ];
 

@@ -86,4 +86,8 @@ class LucideIcons {
   static const IconData building2       = Icons.business_outlined;
   static const IconData layoutGrid      = Icons.grid_view_outlined;
   static const IconData hash            = Icons.tag;
+
+  // messaging
+  static const IconData messageCircle   = Icons.chat_bubble_outline;
+  static const IconData message         = Icons.chat_outlined;
 }

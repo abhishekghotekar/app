@@ -14,6 +14,8 @@ import '../../widgets/status_pill.dart';
 import '../../widgets/user_avatar.dart';
 import 'export_screen.dart';
 import 'student_detail_screen.dart';
+import '../../widgets/app_error_view.dart';
+
 
 class AttendanceListScreen extends StatefulWidget {
   const AttendanceListScreen({super.key});
@@ -70,6 +72,7 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
           _error = e.toString();
           _loading = false;
         });
+        AppErrorView.show(context, e.toString(), onRetry: _fetchData);
       }
     }
   }
@@ -227,31 +230,9 @@ class _AttendanceListScreenState extends State<AttendanceListScreen> {
                     ],
                   )
                 : _error != null
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 80),
-                        children: [
-                          const Icon(LucideIcons.circleAlert, color: AppColors.danger, size: 36),
-                          const SizedBox(height: 12),
-                          Text(
-                            _error!,
-                            style: AppTextStyles.caption.copyWith(color: AppColors.danger),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 20),
-                          Center(
-                            child: ElevatedButton.icon(
-                              onPressed: _fetchData,
-                              icon: const Icon(LucideIcons.refreshCw, size: 14),
-                              label: const Text('Retry'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                            ),
-                          ),
-                        ],
+                    ? AppErrorView(
+                        error: _error!,
+                        onRetry: _fetchData,
                       )
                     : records.isEmpty
                         ? ListView(
