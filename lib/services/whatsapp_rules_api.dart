@@ -8,6 +8,7 @@ import '../models/whatsapp_rule.dart';
 /// Endpoints :
 ///   GET    /whatsapp/rules          → list all rules
 ///   POST   /whatsapp/rules          → create a rule
+///   PUT    /whatsapp/rules/{id}     → full update (all fields)
 ///   PATCH  /whatsapp/rules/{id}     → partial update (e.g. toggle is_active)
 ///   DELETE /whatsapp/rules/{id}     → delete a rule
 class WhatsAppRulesApi {
@@ -95,45 +96,27 @@ class WhatsAppRulesApi {
     );
   }
 
-  // ── TOGGLE (PATCH is_active) ──────────────────────────────────────────────
+  // ── TOGGLE (PUT is_active) ────────────────────────────────────────────────
 
   /// Toggles the `is_active` flag of a rule.
-  static Future<WhatsAppRule> toggleRule(int id, {required bool isActive}) async {
-    final uri = Uri.parse('$_baseUrl$_rulesPath/$id');
-    late http.Response response;
-
-    try {
-      response = await http
-          .patch(
-            uri,
-            headers: _defaultHeaders,
-            body: jsonEncode({'is_active': isActive}),
-          )
-          .timeout(const Duration(seconds: 15));
-    } catch (e) {
-      throw WhatsAppRulesException('Network error while toggling rule.\n($e)');
-    }
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      try {
-        return WhatsAppRule.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>,
-        );
-      } catch (e) {
-        throw WhatsAppRulesException(
-          'Rule toggled but response could not be parsed.\n($e)',
-        );
-      }
-    }
-
-    throw WhatsAppRulesException(
-      'Failed to toggle rule (${response.statusCode}): ${response.body}',
-    );
+  ///
+  /// The server only supports PUT (not PATCH), so the full rule payload is
+  /// sent with only `is_active` flipped.
+  static Future<WhatsAppRule> toggleRule(
+    WhatsAppRule rule, {
+    required bool isActive,
+  }) async {
+    final payload = rule.toJson()..['is_active'] = isActive;
+    return updateRule(rule.id, payload);
   }
 
-  // ── UPDATE (full PATCH) ──────────────────────────────────────────────────
+  // ── UPDATE (full PUT) ────────────────────────────────────────────────────
 
-  /// Performs a partial update on a rule (sends all editable fields).
+  /// Performs a full update on a rule via PUT (replaces all editable fields).
+  ///
+  /// Required fields in [payload]:
+  ///   rule_name, trigger_type, condition, send_to, channels,
+  ///   phone_number, custom_message, send_time, is_active
   static Future<WhatsAppRule> updateRule(
     int id,
     Map<String, dynamic> payload,
@@ -143,7 +126,7 @@ class WhatsAppRulesApi {
 
     try {
       response = await http
-          .patch(uri, headers: _defaultHeaders, body: jsonEncode(payload))
+          .put(uri, headers: _defaultHeaders, body: jsonEncode(payload))
           .timeout(const Duration(seconds: 15));
     } catch (e) {
       throw WhatsAppRulesException('Network error while updating rule.\n($e)');

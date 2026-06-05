@@ -60,7 +60,7 @@ class _RulesListScreenState extends State<RulesListScreen> {
     });
     try {
       final updated =
-          await WhatsAppRulesApi.toggleRule(rule.id, isActive: newActive);
+          await WhatsAppRulesApi.toggleRule(rule, isActive: newActive);
       setState(() {
         _rules = _rules
             .map((r) => r.id == updated.id ? updated : r)
