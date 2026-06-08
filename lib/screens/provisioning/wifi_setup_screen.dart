@@ -35,7 +35,7 @@ class WifiSetupScreen extends StatefulWidget {
   State<WifiSetupScreen> createState() => _WifiSetupScreenState();
 }
 
-enum _Phase { loadingList, ready, sending, joining, done, failed }
+enum _Phase { loadingList, ready, sending, joining, wifiOk, sendingToken, done, failed }
 
 class _WifiSetupScreenState extends State<WifiSetupScreen> {
   _Phase _phase = _Phase.loadingList;
@@ -175,45 +175,74 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
       case ProvisionState.connecting:
         setState(() => _phase = _Phase.joining);
         break;
+
       case ProvisionState.connected:
         await _onConnected(status);
         break;
+
+      case ProvisionState.wifi_ok:
+        // Pi connected to WiFi — ask user to switch to the same network.
+        setState(() => _phase = _Phase.wifiOk);
+        break;
+
+      case ProvisionState.wifi_fail:
+        setState(() {
+          _phase = _Phase.failed;
+          _error = status.message ??
+              'Raspberry Pi could not connect to the Wi-Fi network. '
+              'Please check the Wi-Fi credentials and try again.';
+        });
+        break;
+
       case ProvisionState.failed:
         setState(() {
           _phase = _Phase.failed;
           _error = status.message ?? 'The device could not join that network.';
         });
         break;
+
       case ProvisionState.request_token:
         if (_tokenSent) {
-          debugPrint('[WiFiSetup] Token already sent, ignoring redundant status notification.');
+          debugPrint('[WiFiSetup] Token already sent, ignoring redundant REQUEST_TOKEN.');
           break;
         }
         _tokenSent = true;
+        setState(() => _phase = _Phase.sendingToken);
         try {
           final token = await AuthStorage.accessToken();
-          if (token != null && token.isNotEmpty) {
-            await BleService.sendToken(widget.device, token: token);
+          if (token == null || token.isEmpty) {
             if (mounted) {
-              await _onConnected(ProvisionStatus(
-                state: ProvisionState.connected,
-                ip: 'Local Network',
-                token: token,
-              ));
+              setState(() {
+                _phase = _Phase.failed;
+                _error = 'No access token available to send. Please log in again.';
+              });
             }
-          } else {
-            setState(() => _error = 'No access token available to send.');
+            break;
+          }
+          await BleService.sendToken(widget.device, token: token);
+          if (mounted) {
+            // Navigate to success — IP is not available over this path,
+            // so we use a placeholder that the success screen handles gracefully.
+            await _onConnected(ProvisionStatus(
+              state: ProvisionState.connected,
+              ip: 'Local Network',
+              token: token,
+            ));
           }
         } on BleException catch (e) {
-          setState(() {
-            _phase = _Phase.failed;
-            _error = 'Failed to send token: ${e.message}';
-          });
+          if (mounted) {
+            setState(() {
+              _phase = _Phase.failed;
+              _error = 'Failed to send token: ${e.message}';
+            });
+          }
         } catch (e) {
-          setState(() {
-            _phase = _Phase.failed;
-            _error = 'Error sending token: $e';
-          });
+          if (mounted) {
+            setState(() {
+              _phase = _Phase.failed;
+              _error = 'Error sending token: $e';
+            });
+          }
         }
         break;
     }
@@ -222,17 +251,18 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   Future<void> _onConnected(ProvisionStatus status) async {
     final ip = status.ip ?? '';
     final token = status.token ?? '';
-    if (ip.isEmpty || token.isEmpty) {
+    // Token is always required; IP is optional (token-only path sends 'Local Network').
+    if (token.isEmpty) {
       setState(() {
         _phase = _Phase.failed;
-        _error = 'Device said it joined but did not send its IP/token.';
+        _error = 'Provisioning completed but no auth token was received.';
       });
       return;
     }
     await DeviceStorage.save(
       bleId: widget.device.id,
       name: widget.device.name.isNotEmpty ? widget.device.name : 'CVAI device',
-      ip: ip,
+      ip: ip.isEmpty ? 'Local Network' : ip,
       token: token,
     );
     if (!mounted) return;
@@ -243,7 +273,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
           deviceName: widget.device.name.isNotEmpty
               ? widget.device.name
               : 'CVAI device',
-          ip: ip,
+          ip: ip.isEmpty ? 'Local Network' : ip,
           ssid: _sentSsid ?? _selected?.ssid ?? '',
         ),
       ),
@@ -352,8 +382,8 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
             const SizedBox(height: 16),
             Text(
               _selected != null
-                  ? 'Device is joining "${_selected!.ssid}"…'
-                  : 'Device is joining your network…',
+                  ? 'Raspberry Pi is joining "${_selected!.ssid}"…'
+                  : 'Raspberry Pi is joining your network…',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodyStrong,
             ),
@@ -366,6 +396,29 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
             ),
           ],
         );
+
+      case _Phase.wifiOk:
+        return _wifiOkCard();
+
+      case _Phase.sendingToken:
+        return Column(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Sending authentication token to device…',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyStrong,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Please wait while your device is being configured.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption,
+            ),
+          ],
+        );
+
       case _Phase.done:
         return const SizedBox.shrink();
       case _Phase.ready:
@@ -526,6 +579,106 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  /// Shown when the Pi has joined WiFi and the phone must switch to the
+  /// same network before the Pi sends REQUEST_TOKEN.
+  Widget _wifiOkCard() {
+    final ssid = _sentSsid ?? _selected?.ssid ?? 'the same network';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.successBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(LucideIcons.checkCircle2,
+                      size: 20, color: AppColors.success),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Raspberry Pi connected!',
+                    style: AppTextStyles.bodyStrong.copyWith(
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Your Raspberry Pi successfully joined "$ssid".',
+                style: AppTextStyles.caption.copyWith(height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.infoBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.info.withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(LucideIcons.wifi,
+                      size: 20, color: AppColors.info),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Action required',
+                    style: AppTextStyles.bodyStrong.copyWith(
+                      color: AppColors.info,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Please switch your phone to the "$ssid" Wi-Fi network '  
+                'so it can communicate with the Raspberry Pi.',
+                style: AppTextStyles.caption.copyWith(height: 1.4),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Steps:\n'
+                '  1. Open your phone\'s Settings → Wi-Fi.\n'
+                '  2. Select "$ssid".\n'
+                '  3. Come back here — the setup will continue automatically.',
+                style: AppTextStyles.caption.copyWith(height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Waiting for the device to request your token…',
+                style: AppTextStyles.caption,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

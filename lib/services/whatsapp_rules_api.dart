@@ -8,9 +8,10 @@ import '../models/whatsapp_rule.dart';
 /// Endpoints :
 ///   GET    /whatsapp/rules          → list all rules
 ///   POST   /whatsapp/rules          → create a rule
-///   PUT    /whatsapp/rules/{id}     → full update (all fields)
-///   PATCH  /whatsapp/rules/{id}     → partial update (e.g. toggle is_active)
 ///   DELETE /whatsapp/rules/{id}     → delete a rule
+///
+/// Note: The backend does not support PUT or PATCH. To update or toggle a rule,
+/// we delete the existing rule and create a new one.
 class WhatsAppRulesApi {
   WhatsAppRulesApi._();
 
@@ -20,17 +21,19 @@ class WhatsAppRulesApi {
   static const Map<String, String> _defaultHeaders = {
     'accept': 'application/json',
     'content-type': 'application/json',
-    // Skip ngrok browser-warning redirect (nip.io tunnel behaves similarly)
     'ngrok-skip-browser-warning': 'true',
   };
+
+  /// Builds the URL for a specific rule id.
+  static Uri _ruleUri(int id) =>
+      Uri.parse('$_baseUrl$_rulesPath/$id');
 
   // ── LIST ──────────────────────────────────────────────────────────────────
 
   /// Fetches all WhatsApp rules from the server.
-  ///
-  /// Returns an empty list on 404 (no rules yet).
   static Future<List<WhatsAppRule>> fetchRules() async {
     final uri = Uri.parse('$_baseUrl$_rulesPath');
+    print('WhatsAppRulesApi: GET $uri');
     late http.Response response;
 
     try {
@@ -41,6 +44,7 @@ class WhatsAppRulesApi {
       throw WhatsAppRulesException('Network error while fetching rules.\n($e)');
     }
 
+    print('WhatsAppRulesApi: fetchRules → ${response.statusCode}');
     if (response.statusCode == 404) return [];
 
     if (response.statusCode != 200 && response.statusCode != 201) {
@@ -63,12 +67,9 @@ class WhatsAppRulesApi {
   // ── CREATE ────────────────────────────────────────────────────────────────
 
   /// Creates a new rule.
-  ///
-  /// [payload] must contain:
-  ///   rule_name, trigger_type, condition, send_to, channels,
-  ///   phone_number, custom_message, send_time, is_active
   static Future<WhatsAppRule> createRule(Map<String, dynamic> payload) async {
     final uri = Uri.parse('$_baseUrl$_rulesPath');
+    print('WhatsAppRulesApi: POST $uri');
     late http.Response response;
 
     try {
@@ -79,6 +80,7 @@ class WhatsAppRulesApi {
       throw WhatsAppRulesException('Network error while creating rule.\n($e)');
     }
 
+    print('WhatsAppRulesApi: createRule → ${response.statusCode}');
     if (response.statusCode == 200 || response.statusCode == 201) {
       try {
         return WhatsAppRule.fromJson(
@@ -96,12 +98,9 @@ class WhatsAppRulesApi {
     );
   }
 
-  // ── TOGGLE (PUT is_active) ────────────────────────────────────────────────
+  // ── TOGGLE (DELETE + POST) ────────────────────────────────────────────────
 
   /// Toggles the `is_active` flag of a rule.
-  ///
-  /// The server only supports PUT (not PATCH), so the full rule payload is
-  /// sent with only `is_active` flipped.
   static Future<WhatsAppRule> toggleRule(
     WhatsAppRule rule, {
     required bool isActive,
@@ -110,50 +109,33 @@ class WhatsAppRulesApi {
     return updateRule(rule.id, payload);
   }
 
-  // ── UPDATE (full PUT) ────────────────────────────────────────────────────
+  // ── UPDATE (DELETE + POST) ────────────────────────────────────────────────
 
-  /// Performs a full update on a rule via PUT (replaces all editable fields).
-  ///
-  /// Required fields in [payload]:
-  ///   rule_name, trigger_type, condition, send_to, channels,
-  ///   phone_number, custom_message, send_time, is_active
+  /// Performs a full update on a rule. Since the backend only has POST and DELETE,
+  /// we delete the old rule and create a new one with the updated values.
   static Future<WhatsAppRule> updateRule(
     int id,
     Map<String, dynamic> payload,
   ) async {
-    final uri = Uri.parse('$_baseUrl$_rulesPath/$id');
-    late http.Response response;
-
+    print('WhatsAppRulesApi: Updating rule by deleting ID $id and recreating...');
+    
+    // 1. Delete the old rule
     try {
-      response = await http
-          .put(uri, headers: _defaultHeaders, body: jsonEncode(payload))
-          .timeout(const Duration(seconds: 15));
+      await deleteRule(id);
     } catch (e) {
-      throw WhatsAppRulesException('Network error while updating rule.\n($e)');
+      print('WhatsAppRulesApi: Warning: failed to delete old rule $id: $e. Proceeding to create new one.');
     }
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      try {
-        return WhatsAppRule.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>,
-        );
-      } catch (e) {
-        throw WhatsAppRulesException(
-          'Rule updated but response could not be parsed.\n($e)',
-        );
-      }
-    }
-
-    throw WhatsAppRulesException(
-      'Failed to update rule (${response.statusCode}): ${response.body}',
-    );
+    // 2. Create the new rule
+    return createRule(payload);
   }
 
   // ── DELETE ────────────────────────────────────────────────────────────────
 
   /// Deletes a rule by id.
   static Future<void> deleteRule(int id) async {
-    final uri = Uri.parse('$_baseUrl$_rulesPath/$id');
+    final uri = _ruleUri(id);
+    print('WhatsAppRulesApi: DELETE $uri');
     late http.Response response;
 
     try {
@@ -164,9 +146,12 @@ class WhatsAppRulesApi {
       throw WhatsAppRulesException('Network error while deleting rule.\n($e)');
     }
 
+    print('WhatsAppRulesApi: deleteRule $id → ${response.statusCode}');
+
     if (response.statusCode == 200 ||
-        response.statusCode == 204 ||
-        response.statusCode == 201) {
+        response.statusCode == 201 ||
+        response.statusCode == 202 ||
+        response.statusCode == 204) {
       return; // success
     }
 
