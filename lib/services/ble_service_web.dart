@@ -328,6 +328,17 @@ class BleService {
         state: ProvisionState.request_token,
         message: 'Requesting access token',
       );
+    } else if (normalized == 'wifiok') {
+      return const ProvisionStatus(
+        state: ProvisionState.wifi_ok,
+        message: 'Raspberry Pi connected to WiFi',
+      );
+    } else if (normalized == 'wififail' || normalized == 'wifiFailed') {
+      return const ProvisionStatus(
+        state: ProvisionState.wifi_fail,
+        message: 'Raspberry Pi could not connect to the Wi-Fi network. '
+            'Please check the Wi-Fi credentials and try again.',
+      );
     } else if (normalized == 'connecting') {
       return const ProvisionStatus(
         state: ProvisionState.connecting,
