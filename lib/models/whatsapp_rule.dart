@@ -30,7 +30,7 @@ class WhatsAppRule {
     required this.createdAt,
   });
 
-  final int id;
+  final String id;
   final String ruleName;
 
   /// "time_based" or "event_based"
@@ -72,7 +72,7 @@ class WhatsAppRule {
 
   factory WhatsAppRule.fromJson(Map<String, dynamic> json) {
     return WhatsAppRule(
-      id: (json['id'] as num).toInt(),
+      id: (json['id'] ?? '').toString(),
       ruleName: json['rule_name'] as String? ?? '',
       triggerType: json['trigger_type'] as String? ?? 'time_based',
       condition: json['condition'] as String? ?? 'all',
@@ -81,7 +81,7 @@ class WhatsAppRule {
       phoneNumber: json['phone_number'] as String? ?? '',
       customMessage: json['custom_message'] as String? ?? '',
       sendTime: json['send_time'] as String? ?? '09:00',
-      isActive: json['is_active'] as bool? ?? true,
+      isActive: json['enabled'] as bool? ?? json['is_active'] as bool? ?? true,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
     );
@@ -96,6 +96,7 @@ class WhatsAppRule {
         'phone_number': phoneNumber,
         'custom_message': customMessage,
         'send_time': sendTime,
+        'enabled': isActive,
         'is_active': isActive,
       };
 

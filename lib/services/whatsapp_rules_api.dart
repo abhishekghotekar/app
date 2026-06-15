@@ -25,7 +25,7 @@ class WhatsAppRulesApi {
   };
 
   /// Builds the URL for a specific rule id.
-  static Uri _ruleUri(int id) =>
+  static Uri _ruleUri(String id) =>
       Uri.parse('$_baseUrl$_rulesPath/$id');
 
   // ── LIST ──────────────────────────────────────────────────────────────────
@@ -98,15 +98,46 @@ class WhatsAppRulesApi {
     );
   }
 
-  // ── TOGGLE (DELETE + POST) ────────────────────────────────────────────────
+  // ── TOGGLE (PATCH) ────────────────────────────────────────────────────────
 
-  /// Toggles the `is_active` flag of a rule.
+  /// Toggles the `enabled` flag of a rule using the PATCH endpoint.
   static Future<WhatsAppRule> toggleRule(
     WhatsAppRule rule, {
     required bool isActive,
   }) async {
-    final payload = rule.toJson()..['is_active'] = isActive;
-    return updateRule(rule.id, payload);
+    final uri = Uri.parse('$_baseUrl$_rulesPath/${rule.id}/toggle');
+    print('WhatsAppRulesApi: PATCH $uri');
+    late http.Response response;
+
+    try {
+      response = await http
+          .patch(
+            uri,
+            headers: _defaultHeaders,
+            body: jsonEncode({'enabled': isActive}),
+          )
+          .timeout(const Duration(seconds: 15));
+    } catch (e) {
+      throw WhatsAppRulesException('Network error while toggling rule.\n($e)');
+    }
+
+    print('WhatsAppRulesApi: toggleRule ${rule.id} → ${response.statusCode}');
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      try {
+        return WhatsAppRule.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      } catch (e) {
+        throw WhatsAppRulesException(
+          'Rule toggled but response could not be parsed.\n($e)',
+        );
+      }
+    }
+
+    throw WhatsAppRulesException(
+      'Failed to toggle rule (${response.statusCode}): ${response.body}',
+    );
   }
 
   // ── UPDATE (DELETE + POST) ────────────────────────────────────────────────
@@ -114,7 +145,7 @@ class WhatsAppRulesApi {
   /// Performs a full update on a rule. Since the backend only has POST and DELETE,
   /// we delete the old rule and create a new one with the updated values.
   static Future<WhatsAppRule> updateRule(
-    int id,
+    String id,
     Map<String, dynamic> payload,
   ) async {
     print('WhatsAppRulesApi: Updating rule by deleting ID $id and recreating...');
@@ -133,7 +164,7 @@ class WhatsAppRulesApi {
   // ── DELETE ────────────────────────────────────────────────────────────────
 
   /// Deletes a rule by id.
-  static Future<void> deleteRule(int id) async {
+  static Future<void> deleteRule(String id) async {
     final uri = _ruleUri(id);
     print('WhatsAppRulesApi: DELETE $uri');
     late http.Response response;
@@ -149,9 +180,9 @@ class WhatsAppRulesApi {
     print('WhatsAppRulesApi: deleteRule $id → ${response.statusCode}');
 
     if (response.statusCode == 200 ||
-        response.statusCode == 201 ||
-        response.statusCode == 202 ||
-        response.statusCode == 204) {
+      response.statusCode == 201 ||
+      response.statusCode == 202 ||
+      response.statusCode == 204) {
       return; // success
     }
 
