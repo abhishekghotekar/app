@@ -12,6 +12,8 @@
 	<string>CVAI finds your attendance device on the local network after pairing.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>CVAI uses the camera for face enrolment.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CVAI uses the microphone for talk-back audio streaming.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
