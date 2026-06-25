@@ -223,10 +223,19 @@ class _CameraListScreenState extends State<CameraListScreen>
         alignment: Alignment.center,
         children: [
           Center(
-            child: MjpegStreamPlayer(
-              url: cam.rtspUrl,
-              headers: const {'ngrok-skip-browser-warning': 'true'},
-              fit: BoxFit.contain,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => LiveCameraViewScreen(camera: cam),
+                  ),
+                );
+              },
+              child: MjpegStreamPlayer(
+                url: cam.rtspUrl,
+                headers: const {'ngrok-skip-browser-warning': 'true'},
+                fit: BoxFit.contain,
+              ),
             ),
           ),
           // Floating Mic Button overlaid in bottom center
