@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'auth_storage.dart';
+import 'attendance_api.dart';
 
 /// Thrown when face registration fails with a user-readable message.
 class FaceRegisterException implements Exception {
@@ -23,6 +24,14 @@ class FaceRegisterException implements Exception {
 ///   - files        : one or more face image files
 class FaceRegisterApi {
   FaceRegisterApi._();
+
+  static Future<String?> _getToken() async {
+    final token = await AuthStorage.accessToken();
+    if (token == null || token.isEmpty || token == 'mock_access_token_from_skip_login') {
+      return AttendanceApi.fallbackToken;
+    }
+    return token;
+  }
 
   /// Change this to your current ngrok URL.
   static const String baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
@@ -82,14 +91,19 @@ class FaceRegisterApi {
 
     final uri = Uri.parse('$baseUrl/face/register');
 
+    final token = await _getToken();
     final request = http.MultipartRequest('POST', uri)
       ..headers['accept'] = 'application/json'
-      ..fields['employee_id'] = userId.trim()
-      ..fields['client_id'] = clientId.trim()
-      ..fields['full_name'] = fullName.trim()
-      ..fields['attendance'] = attendance.toString()
-      ..fields['weapon'] = weapon.toString()
-      ..fields['wanted'] = wanted.toString();
+      ..headers['ngrok-skip-browser-warning'] = 'true';
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.fields['employee_id'] = userId.trim();
+    request.fields['client_id'] = clientId.trim();
+    request.fields['full_name'] = fullName.trim();
+    request.fields['attendance'] = attendance.toString();
+    request.fields['weapon'] = weapon.toString();
+    request.fields['wanted'] = wanted.toString();
 
     for (final file in imageFiles) {
       request.files.add(await http.MultipartFile.fromPath('files', file.path));
@@ -128,6 +142,7 @@ class FaceRegisterApi {
       '$baseUrl/face/client/$activeClientId/users/${Uri.encodeComponent(userId)}',
     );
 
+    final token = await _getToken();
     late http.Response response;
     try {
       response = await http
@@ -136,6 +151,7 @@ class FaceRegisterApi {
             headers: {
               'accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
+              if (token != null) 'Authorization': 'Bearer $token',
             },
           )
           .timeout(const Duration(seconds: 30));
@@ -178,12 +194,14 @@ class FaceRegisterApi {
           'registration_status': 'all',
         },
       );
+      final token = await _getToken();
       listResponse = await http
           .get(
             uri,
             headers: {
               'accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
+              if (token != null) 'Authorization': 'Bearer $token',
             },
           )
           .timeout(const Duration(seconds: 30));
@@ -260,12 +278,14 @@ class FaceRegisterApi {
   /// Fetches the current face configurations.
   static Future<Map<String, bool>> getConfig() async {
     final uri = Uri.parse('$baseUrl/face/config');
+    final token = await _getToken();
     try {
       final response = await http.get(
         uri,
         headers: {
           'accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 15));
 
@@ -293,6 +313,7 @@ class FaceRegisterApi {
     required bool attendanceEnabled,
   }) async {
     final uri = Uri.parse('$baseUrl/face/config');
+    final token = await _getToken();
     final payload = {
       'weapon_detection_enabled': weaponDetectionEnabled,
       'wanted_detection_enabled': wantedDetectionEnabled,
@@ -306,6 +327,7 @@ class FaceRegisterApi {
         headers: {
           'accept': 'application/json',
           'content-type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 15));

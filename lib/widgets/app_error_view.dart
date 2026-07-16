@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../screens/auth/login_screen.dart';
+import '../services/auth_storage.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_text_styles.dart';
@@ -32,12 +34,14 @@ class AppErrorView extends StatefulWidget {
     
     // 1. Session Expiration / Unauthorized
     if (err.contains('401') || err.contains('403') || err.contains('unauthorized') || err.contains('invalid token')) {
-      title = 'Session Expired';
-      subtitle = 'Your session has expired or the token is invalid. Please log in again.';
-      icon = LucideIcons.lock;
-      color = AppColors.danger;
-      bg = AppColors.dangerBg;
+      AuthStorage.clear();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      return;
     } 
+
     // 2. Network timeout / offline
     else if (err.contains('socketexception') || err.contains('timeout') || err.contains('network') || err.contains('host lookup')) {
       title = 'Connection Timeout';

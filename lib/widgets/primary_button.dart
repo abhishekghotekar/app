@@ -27,40 +27,54 @@ class PrimaryButton extends StatelessWidget {
     final button = AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
       opacity: enabled ? 1 : 0.55,
-      child: Material(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 48,
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: loading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
-                    ),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (icon != null) ...[
-                        Icon(icon, size: 18, color: Colors.white),
-                        const SizedBox(width: 8),
-                      ],
-                      Text(
-                        label,
-                        style: AppTextStyles.button.copyWith(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              height: 56, // Increased from 52
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: loading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (icon != null) ...[
+                          Icon(icon, size: 18, color: Colors.white),
+                          const SizedBox(width: 8),
+                        ],
+                        Text(
+                          label,
+                          style: AppTextStyles.button.copyWith(
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

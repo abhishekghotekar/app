@@ -12,6 +12,7 @@ class AppCard extends StatelessWidget {
     this.elevated = false,
     this.margin,
     this.borderColor,
+    this.color,
   });
 
   final Widget child;
@@ -20,11 +21,12 @@ class AppCard extends StatelessWidget {
   final bool elevated;
   final EdgeInsetsGeometry? margin;
   final Color? borderColor;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final decoration = BoxDecoration(
-      color: AppColors.surface,
+      color: color ?? AppColors.surface,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: borderColor ?? AppColors.border),
       boxShadow: elevated ? const [AppColors.cardShadow] : null,

@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 
 import '../models/api_user.dart';
 import 'face_register_api.dart';
+import 'auth_storage.dart';
+import 'attendance_api.dart';
 
 /// Fetches the user list from the CVAI face API.
 ///
@@ -61,6 +63,11 @@ class UserListApi {
         'registration_status': registrationStatus,
     };
 
+    final token = await AuthStorage.accessToken().then((t) =>
+        (t == null || t.isEmpty || t == 'mock_access_token_from_skip_login')
+            ? AttendanceApi.fallbackToken
+            : t);
+
     final activeClientId = await FaceRegisterApi.getActiveClientId();
     final uri = Uri.parse(
       '${FaceRegisterApi.baseUrl}/face/client/$activeClientId/users',
@@ -73,6 +80,7 @@ class UserListApi {
         headers: {
           'accept': 'application/json',
           'ngrok-skip-browser-warning': 'true',
+          'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 20));
     } catch (e) {
