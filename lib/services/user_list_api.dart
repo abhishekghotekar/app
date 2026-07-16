@@ -61,8 +61,9 @@ class UserListApi {
         'registration_status': registrationStatus,
     };
 
+    final activeClientId = await FaceRegisterApi.getActiveClientId();
     final uri = Uri.parse(
-      '${FaceRegisterApi.baseUrl}/face/client/${FaceRegisterApi.clientId}/users',
+      '${FaceRegisterApi.baseUrl}/face/client/$activeClientId/users',
     ).replace(queryParameters: queryParams);
 
     late http.Response response;

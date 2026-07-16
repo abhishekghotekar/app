@@ -41,6 +41,10 @@ class _AddUserScreenState extends State<AddUserScreen> {
   String? _loadingError;
   ApiUser? _selectedUser;
 
+  bool _attendance = true;
+  bool _weapon = false;
+  bool _wanted = false;
+
   @override
   void initState() {
     super.initState();
@@ -143,6 +147,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
         clientId:    clientId,
         fullName:    user.fullName.trim(),
         imageFiles:  _capturedPhotos,
+        attendance:  _attendance,
+        weapon:      _weapon,
+        wanted:      _wanted,
       );
 
       if (!mounted) return;
@@ -183,34 +190,6 @@ class _AddUserScreenState extends State<AddUserScreen> {
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 3),
       ),
-    );
-  }
-
-  // ── Info row helper ─────────────────────────────────────────────────────────
-  Widget _infoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 13, color: AppColors.textMuted),
-        const SizedBox(width: 6),
-        Text(
-          '$label: ',
-          style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 
@@ -335,6 +314,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
                                     _nameCtrl.clear();
                                     textEditingController.clear();
                                     _capturedPhotos = [];
+                                    _attendance = true;
+                                    _weapon = false;
+                                    _wanted = false;
                                   });
                                   focusNode.requestFocus();
                                 },
@@ -348,6 +330,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
                               _userIdCtrl.clear();
                               _clientIdCtrl.text = FaceRegisterApi.clientId;
                               _capturedPhotos = [];
+                              _attendance = true;
+                              _weapon = false;
+                              _wanted = false;
                             });
                           }
                         },
@@ -485,6 +470,117 @@ class _AddUserScreenState extends State<AddUserScreen> {
                  ],
 
                 // User ID and Client ID info card removed as requested
+                const SizedBox(height: 28),
+
+                // ── Registration Settings ─────────────────────────────────
+                Row(
+                  children: [
+                    const Icon(LucideIcons.settings,
+                        size: 14, color: AppColors.textSecondary),
+                    const SizedBox(width: 6),
+                    Text('REGISTRATION SETTINGS', style: AppTextStyles.label),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                AppCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(LucideIcons.userCheck,
+                                size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Attendance Tracking',
+                                      style: AppTextStyles.bodyStrong),
+                                  const SizedBox(height: 2),
+                                  const Text('Mark attendance when face is detected',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _attendance,
+                              activeTrackColor: AppColors.primary,
+                              onChanged: (v) => setState(() => _attendance = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: AppColors.border),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(LucideIcons.shieldAlert,
+                                size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Weapon Detection',
+                                      style: AppTextStyles.bodyStrong),
+                                  const SizedBox(height: 2),
+                                  const Text('Scan for weapons when face is detected',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _weapon,
+                              activeTrackColor: AppColors.primary,
+                              onChanged: (v) => setState(() => _weapon = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: AppColors.border),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 4),
+                        child: Row(
+                          children: [
+                            const Icon(LucideIcons.circleAlert,
+                                size: 18, color: AppColors.textSecondary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Wanted List Check',
+                                      style: AppTextStyles.bodyStrong),
+                                  const SizedBox(height: 2),
+                                  const Text('Alert if face matches wanted records',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _wanted,
+                              activeTrackColor: AppColors.primary,
+                              onChanged: (v) => setState(() => _wanted = v),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 28),
 
                 // ── Face Enrollment section label ─────────────────────────

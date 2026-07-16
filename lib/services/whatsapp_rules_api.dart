@@ -13,7 +13,7 @@ import '../models/whatsapp_rule.dart';
 class WhatsAppRulesApi {
   WhatsAppRulesApi._();
 
-  static const String _baseUrl = 'https://baap-tunnel-13-201-117-192.nip.io';
+  static const String _baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
   static const String _rulesPath = '/whatsapp/rules';
 
   static const Map<String, String> _defaultHeaders = {
