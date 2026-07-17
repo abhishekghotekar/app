@@ -41,7 +41,7 @@ class _DashboardTabState extends State<DashboardTab> {
   Future<void> _fetchData() async {
     if (!mounted) return;
     setState(() {
-      _loading = true;
+      _loading = _records.isEmpty;
       _error = null;
     });
 
@@ -56,10 +56,13 @@ class _DashboardTabState extends State<DashboardTab> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
           _loading = false;
+          if (_records.isEmpty) {
+            _error = e.toString();
+          } else {
+            AppErrorView.show(context, e.toString(), onRetry: _fetchData);
+          }
         });
-        AppErrorView.show(context, e.toString(), onRetry: _fetchData);
       }
     }
   }
