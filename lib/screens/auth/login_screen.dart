@@ -22,8 +22,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'sauravrajput@gmail.com');
-  final _password = TextEditingController(text: 'Saurav@99');
+  final _email = TextEditingController(text: 'rao.ghuge@gmail.com');
+  final _password = TextEditingController(text: 'Raoghuge@2025');
   bool _obscure = true;
   bool _loading = false;
 
@@ -81,9 +81,9 @@ class _LoginScreenState extends State<LoginScreen> {
         expiresIn: 3600,
         user: const AuthUser(
           id: 'mock_user_id',
-          firstName: 'Developer',
-          lastName: 'User',
-          email: 'dev@example.com',
+          firstName: 'Rao',
+          lastName: 'Ghuge',
+          email: 'rao.ghuge@gmail.com',
           phone: '1234567890',
           status: 'active',
         ),
