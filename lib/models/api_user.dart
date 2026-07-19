@@ -67,7 +67,7 @@ class ApiUser {
 
     return ApiUser(
       id:                 finalId,
-      clientId:           parsedClientId ?? _str(json, ['client_id', 'clientId']) ?? 'edb3ac03-5d77-45ac-a187-794ae63f1ef4',
+      clientId:           parsedClientId ?? _str(json, ['client_id', 'clientId']) ?? '571bf643-60d5-4e9c-9c99-b8a52ca1832a',
       fullName:           _str(json, ['full_name', 'fullName', 'name']) ?? 'Unknown',
       status:             _str(json, ['status']) ?? 'active',
       registrationStatus: _str(json, ['registration_status', 'registrationStatus']) ?? 'unregistered',

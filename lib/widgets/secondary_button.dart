@@ -29,17 +29,17 @@ class SecondaryButton extends StatelessWidget {
       opacity: enabled ? 1 : 0.55,
       child: Material(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: enabled ? onPressed : null,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Container(
-            height: 48,
+            height: 56, // Increased from 52
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
             ),
             child: loading
                 ? const SizedBox(

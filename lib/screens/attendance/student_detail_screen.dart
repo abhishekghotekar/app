@@ -40,7 +40,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
   }
   Future<void> _fetchAttendanceHistory() async {
     setState(() {
-      _loading = true;
+      _loading = _groupedHistory.isEmpty;
       _error = null;
     });
 
@@ -109,10 +109,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
           _loading = false;
+          if (_groupedHistory.isEmpty) {
+            _error = e.toString();
+          } else {
+            AppErrorView.show(context, e.toString(), onRetry: _fetchAttendanceHistory);
+          }
         });
-        AppErrorView.show(context, e.toString(), onRetry: _fetchAttendanceHistory);
       }
     }
   }

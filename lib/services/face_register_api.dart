@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'auth_storage.dart';
+import 'attendance_api.dart';
 
 /// Thrown when face registration fails with a user-readable message.
 class FaceRegisterException implements Exception {
@@ -23,17 +25,65 @@ class FaceRegisterException implements Exception {
 class FaceRegisterApi {
   FaceRegisterApi._();
 
+  static Future<String?> _getToken() async {
+    final token = await AuthStorage.accessToken();
+    if (token == null || token.isEmpty || token == 'mock_access_token_from_skip_login') {
+      return AttendanceApi.fallbackToken;
+    }
+    return token;
+  }
+
   /// Change this to your current ngrok URL.
   static const String baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
 
   /// The client (organisation) ID for all face API calls.
-  static const String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';
+  static const String clientId = '571bf643-60d5-4e9c-9c99-b8a52ca1832a';
+
+  static Map<String, dynamic>? _parseJwt(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      String payload = parts[1];
+
+      int padLength = 4 - (payload.length % 4);
+      if (padLength < 4) {
+        payload += '=' * padLength;
+      }
+
+      final decoded = utf8.decode(base64Url.decode(payload));
+      return jsonDecode(decoded) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<String> getActiveClientId() async {
+    try {
+      final token = await AuthStorage.accessToken();
+      if (token != null && token.isNotEmpty) {
+        final decoded = _parseJwt(token);
+        if (decoded != null && decoded.containsKey('clients')) {
+          final clients = decoded['clients'] as Map<String, dynamic>?;
+          if (clients != null && clients.isNotEmpty) {
+            if (clients.containsKey(clientId)) {
+              return clientId;
+            }
+            return clients.keys.first;
+          }
+        }
+      }
+    } catch (_) {}
+    return clientId;
+  }
 
   static Future<void> register({
     required String userId,
     required String clientId,
     required String fullName,
     required List<File> imageFiles,
+    bool attendance = true,
+    bool weapon = false,
+    bool wanted = false,
   }) async {
     if (imageFiles.isEmpty) {
       throw FaceRegisterException('At least one face photo is required.');
@@ -41,11 +91,19 @@ class FaceRegisterApi {
 
     final uri = Uri.parse('$baseUrl/face/register');
 
+    final token = await _getToken();
     final request = http.MultipartRequest('POST', uri)
       ..headers['accept'] = 'application/json'
-      ..fields['employee_id'] = userId.trim()
-      ..fields['client_id'] = clientId.trim()
-      ..fields['full_name'] = fullName.trim();
+      ..headers['ngrok-skip-browser-warning'] = 'true';
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.fields['employee_id'] = userId.trim();
+    request.fields['client_id'] = clientId.trim();
+    request.fields['full_name'] = fullName.trim();
+    request.fields['attendance'] = attendance.toString();
+    request.fields['weapon'] = weapon.toString();
+    request.fields['wanted'] = wanted.toString();
 
     for (final file in imageFiles) {
       request.files.add(await http.MultipartFile.fromPath('files', file.path));
@@ -79,10 +137,12 @@ class FaceRegisterApi {
   ///
   /// API: DELETE /face/client/{clientId}/users/{userId}
   static Future<void> unregister({required String userId}) async {
+    final activeClientId = await getActiveClientId();
     final uri = Uri.parse(
-      '$baseUrl/face/client/$clientId/users/${Uri.encodeComponent(userId)}',
+      '$baseUrl/face/client/$activeClientId/users/${Uri.encodeComponent(userId)}',
     );
 
+    final token = await _getToken();
     late http.Response response;
     try {
       response = await http
@@ -91,6 +151,7 @@ class FaceRegisterApi {
             headers: {
               'accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
+              if (token != null) 'Authorization': 'Bearer $token',
             },
           )
           .timeout(const Duration(seconds: 30));
@@ -121,10 +182,11 @@ class FaceRegisterApi {
   static Future<UnregisterAllResult> unregisterAll({
     void Function(int done, int total, String? error)? onProgress,
   }) async {
+    final activeClientId = await getActiveClientId();
     // 1. Fetch all users (all registration statuses)
     late http.Response listResponse;
     try {
-      final uri = Uri.parse('$baseUrl/face/client/$clientId/users').replace(
+      final uri = Uri.parse('$baseUrl/face/client/$activeClientId/users').replace(
         queryParameters: {
           'page': '1',
           'limit': '200',
@@ -132,12 +194,14 @@ class FaceRegisterApi {
           'registration_status': 'all',
         },
       );
+      final token = await _getToken();
       listResponse = await http
           .get(
             uri,
             headers: {
               'accept': 'application/json',
               'ngrok-skip-browser-warning': 'true',
+              if (token != null) 'Authorization': 'Bearer $token',
             },
           )
           .timeout(const Duration(seconds: 30));
@@ -206,6 +270,79 @@ class FaceRegisterApi {
   }
 
   static dynamic _jsonDecode(String src) => jsonDecode(src);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Config
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Fetches the current face configurations.
+  static Future<Map<String, bool>> getConfig() async {
+    final uri = Uri.parse('$baseUrl/face/config');
+    final token = await _getToken();
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return {
+          'weapon_detection_enabled': decoded['weapon_detection_enabled'] as bool? ?? false,
+          'wanted_detection_enabled': decoded['wanted_detection_enabled'] as bool? ?? false,
+          'attendance_enabled': decoded['attendance_enabled'] as bool? ?? false,
+        };
+      }
+    } catch (_) {}
+    // Return default map if GET fails or is not implemented
+    return {
+      'weapon_detection_enabled': false,
+      'wanted_detection_enabled': false,
+      'attendance_enabled': true,
+    };
+  }
+
+  /// Updates the face configurations.
+  static Future<void> updateConfig({
+    required bool weaponDetectionEnabled,
+    required bool wantedDetectionEnabled,
+    required bool attendanceEnabled,
+  }) async {
+    final uri = Uri.parse('$baseUrl/face/config');
+    final token = await _getToken();
+    final payload = {
+      'weapon_detection_enabled': weaponDetectionEnabled,
+      'wanted_detection_enabled': wantedDetectionEnabled,
+      'attendance_enabled': attendanceEnabled,
+    };
+
+    late http.Response response;
+    try {
+      response = await http.post(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 15));
+    } catch (e) {
+      throw FaceRegisterException('Network error while updating configuration.\n($e)');
+    }
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return; // success
+    }
+
+    throw FaceRegisterException(
+      'Failed to update configuration (${response.statusCode}):\n${response.body}',
+    );
+  }
 }
 
 /// Result returned by [FaceRegisterApi.unregisterAll].

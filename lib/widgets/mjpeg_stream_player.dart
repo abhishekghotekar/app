@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
+import '../theme/app_icons.dart';
 
 class MjpegStreamPlayer extends StatefulWidget {
   const MjpegStreamPlayer({
@@ -336,24 +337,67 @@ class _MjpegStreamPlayerState extends State<MjpegStreamPlayer> {
     }
 
     if (_error != null) {
+      final err = _error!.toLowerCase();
+      final isNetwork = err.contains('socketexception') ||
+          err.contains('timeout') ||
+          err.contains('network') ||
+          err.contains('host lookup') ||
+          err.contains('failed to fetch');
+
+      final String title = isNetwork ? 'Camera Feed Offline' : 'Connection Failed';
+      final String subtitle = isNetwork
+          ? 'Failed to connect to the camera server. Please check the network configuration and try again.'
+          : _error!;
+      final IconData icon = isNetwork ? LucideIcons.wifiOff : LucideIcons.circleAlert;
+      final Color iconColor = isNetwork ? AppColors.warning : AppColors.danger;
+      final Color iconBg = isNetwork ? AppColors.warningBg : AppColors.dangerBg;
+
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: AppColors.danger,
-                size: 36,
+              // Styled Icon circle
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 28, color: iconColor),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
+              
+              // Clean white title
               Text(
-                _error!,
-                style: AppTextStyles.caption.copyWith(color: AppColors.danger),
+                title,
+                style: AppTextStyles.bodyStrong.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
+              
+              // Light grey user-friendly subtitle
+              Text(
+                subtitle,
+                style: AppTextStyles.caption.copyWith(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: Colors.white70,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 20),
+              
+              // Premium styled Retry button
               ElevatedButton.icon(
                 onPressed: () {
                   setState(() {
@@ -370,13 +414,21 @@ class _MjpegStreamPlayerState extends State<MjpegStreamPlayer> {
                   });
                   _startStream();
                 },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Retry'),
+                icon: const Icon(LucideIcons.refreshCw, size: 14),
+                label: const Text(
+                  'Retry',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),

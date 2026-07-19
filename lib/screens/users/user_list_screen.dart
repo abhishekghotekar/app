@@ -57,7 +57,12 @@ class _UserListScreenState extends State<UserListScreen> {
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   Future<void> _loadUsers({bool silent = false}) async {
-    if (!silent) setState(() { _loading = true; _error = null; });
+    if (!silent) {
+      setState(() {
+        _loading = _allUsers.isEmpty;
+        _error = null;
+      });
+    }
 
     try {
       final res = await UserListApi.fetchUsers();
@@ -75,13 +80,27 @@ class _UserListScreenState extends State<UserListScreen> {
       }
     } on UserListException catch (e) {
       if (mounted) {
-        setState(() { _loading = false; _error = e.message; });
-        AppErrorView.show(context, e.message, onRetry: _loadUsers);
+        setState(() {
+          _loading = false;
+          _firstLoad = false;
+          if (_allUsers.isEmpty) {
+            _error = e.message;
+          } else {
+            AppErrorView.show(context, e.message, onRetry: _loadUsers);
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
-        setState(() { _loading = false; _error = e.toString(); });
-        AppErrorView.show(context, e.toString(), onRetry: _loadUsers);
+        setState(() {
+          _loading = false;
+          _firstLoad = false;
+          if (_allUsers.isEmpty) {
+            _error = e.toString();
+          } else {
+            AppErrorView.show(context, e.toString(), onRetry: _loadUsers);
+          }
+        });
       }
     }
   }

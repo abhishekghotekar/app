@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/whatsapp_rule.dart';
+import 'auth_storage.dart';
+import 'attendance_api.dart';
 
 /// API service for the WhatsApp Rules backend.
 ///
@@ -15,7 +17,7 @@ import '../models/whatsapp_rule.dart';
 class WhatsAppRulesApi {
   WhatsAppRulesApi._();
 
-  static const String _baseUrl = 'https://baap-tunnel-13-201-117-192.nip.io';
+  static const String _baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
   static const String _rulesPath = '/whatsapp/rules';
 
   static const Map<String, String> _defaultHeaders = {
@@ -38,7 +40,7 @@ class WhatsAppRulesApi {
 
     try {
       response = await http
-          .get(uri, headers: _defaultHeaders)
+          .get(uri, headers: await _getHeaders())
           .timeout(const Duration(seconds: 15));
     } catch (e) {
       throw WhatsAppRulesException('Network error while fetching rules.\n($e)');
@@ -74,7 +76,7 @@ class WhatsAppRulesApi {
 
     try {
       response = await http
-          .post(uri, headers: _defaultHeaders, body: jsonEncode(payload))
+          .post(uri, headers: await _getHeaders(), body: jsonEncode(payload))
           .timeout(const Duration(seconds: 15));
     } catch (e) {
       throw WhatsAppRulesException('Network error while creating rule.\n($e)');
@@ -171,7 +173,7 @@ class WhatsAppRulesApi {
 
     try {
       response = await http
-          .delete(uri, headers: _defaultHeaders)
+          .delete(uri, headers: await _getHeaders())
           .timeout(const Duration(seconds: 15));
     } catch (e) {
       throw WhatsAppRulesException('Network error while deleting rule.\n($e)');

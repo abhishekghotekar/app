@@ -7,14 +7,8 @@ import '../../services/face_register_api.dart';
 import '../../services/audio_stream_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/app_card.dart';
 import '../../widgets/empty_state.dart';
-import '../../widgets/secondary_button.dart';
-import '../../widgets/status_pill.dart';
-import '../dashboard/live_camera_view_screen.dart';
 import '../../widgets/mjpeg_stream_player.dart';
-import 'add_camera_screen.dart';
-import 'camera_settings_screen.dart';
 
 class CameraListScreen extends StatefulWidget {
   const CameraListScreen({super.key});
