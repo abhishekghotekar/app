@@ -39,6 +39,14 @@ enum ProvisionState {
 
   /// Device needs the access token to authenticate with the cloud.
   request_token,
+
+  /// Raspberry Pi successfully connected to the target Wi-Fi network.
+  /// The mobile device should now switch to the same network.
+  wifi_ok,
+
+  /// Raspberry Pi could not connect to the Wi-Fi network (wrong password,
+  /// network out of range, etc.).
+  wifi_fail,
 }
 
 /// One status update from the device's status characteristic during the
@@ -64,7 +72,11 @@ class ProvisionStatus {
   final String? message;
 
   factory ProvisionStatus.fromJson(Map<String, dynamic> json) {
-    final raw = (json['state'] as String? ?? 'failed').toLowerCase().trim();
+    // Normalize: "WIFI_OK" → "wifi_ok", "WIFI_FAIL" → "wifi_fail", etc.
+    final raw = (json['state'] as String? ?? 'failed')
+        .toLowerCase()
+        .trim()
+        .replaceAll('-', '_');
     final state = ProvisionState.values.firstWhere(
       (s) => s.name == raw,
       orElse: () => ProvisionState.failed,

@@ -50,6 +50,8 @@ class LucideIcons {
   static const IconData video           = Icons.videocam_outlined;
   static const IconData videoOff        = Icons.videocam_off_outlined;
   static const IconData play            = Icons.play_arrow;
+  static const IconData mic             = Icons.mic;
+  static const IconData micOff          = Icons.mic_off;
 
   // alerts / status
   static const IconData bell            = Icons.notifications_outlined;
@@ -90,4 +92,8 @@ class LucideIcons {
   // messaging
   static const IconData messageCircle   = Icons.chat_bubble_outline;
   static const IconData message         = Icons.chat_outlined;
+
+  // volume / audio playback
+  static const IconData volume2         = Icons.volume_up_outlined;
+  static const IconData volumeX         = Icons.volume_off_outlined;
 }

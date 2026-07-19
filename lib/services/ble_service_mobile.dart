@@ -302,7 +302,29 @@ class BleService {
     } else {
       await _bondClassic(device, ctl);
       _log('classic bond successful, now connecting BLE GATT for provisioning...');
-      await _connectBle(device, ctl);
+
+      // After a Classic bond the BLE GATT stack on the remote device may not
+      // be ready immediately. Android error 133 (ANDROID_SPECIFIC_ERROR) is
+      // the typical symptom. Retry up to 3 times with increasing back-off.
+      const maxGattRetries = 3;
+      for (int attempt = 1; attempt <= maxGattRetries; attempt++) {
+        final waitMs = attempt * 1500; // 1.5 s, 3 s, 4.5 s
+        _log('BLE GATT attempt $attempt/$maxGattRetries — waiting ${waitMs}ms before connect...');
+        await Future<void>.delayed(Duration(milliseconds: waitMs));
+        try {
+          await _connectBle(device, ctl);
+          _log('BLE GATT connected on attempt $attempt');
+          return; // success — exit connect()
+        } catch (e) {
+          if (attempt == maxGattRetries) {
+            _log('BLE GATT failed after $maxGattRetries attempts: $e');
+            rethrow; // surface the error to the UI
+          }
+          _log('BLE GATT attempt $attempt failed ($e) — retrying...');
+          // Reset the controller state back to connecting for the next attempt
+          if (!ctl.isClosed) ctl.add(BleConnectionState.connecting);
+        }
+      }
     }
   }
 
@@ -394,7 +416,14 @@ class BleService {
     } catch (e) {
       if (!ctl.isClosed) ctl.add(BleConnectionState.failed);
       _log('state:failed ${_deviceTag(device)} error=$e');
-      throw BleException(_humanizeBleError(e));
+      final msg = e.toString();
+      if (msg.contains('android-code: 133') || msg.contains('ANDROID_SPECIFIC_ERROR')) {
+        throw BleException(
+          'Could not reach the device over BLE. '
+          'Please move closer and tap Try again.',
+        );
+      }
+      throw BleException('Could not connect: $e');
     }
   }
 
@@ -679,6 +708,17 @@ class BleService {
         state: ProvisionState.request_token,
         message: 'Requesting access token',
       );
+    } else if (normalized == 'wifiok') {
+      return const ProvisionStatus(
+        state: ProvisionState.wifi_ok,
+        message: 'Raspberry Pi connected to WiFi',
+      );
+    } else if (normalized == 'wififail' || normalized == 'wifiFailed') {
+      return const ProvisionStatus(
+        state: ProvisionState.wifi_fail,
+        message: 'Raspberry Pi could not connect to the Wi-Fi network. '
+            'Please check the Wi-Fi credentials and try again.',
+      );
     } else if (normalized == 'connecting') {
       return const ProvisionStatus(
         state: ProvisionState.connecting,
@@ -711,10 +751,19 @@ class BleService {
   }
 
   static String _humanizeBleError(Object e) {
-    final s = e.toString().toLowerCase();
-    if (s.contains('timeout')) return 'The device did not respond in time.';
-    if (s.contains('cancel')) return 'The connection was canceled.';
-    if (s.contains('null gatt')) {
+    final s = e.toString();
+    if (s.contains('android-code: 133') || s.contains('ANDROID_SPECIFIC_ERROR')) {
+      return 'Could not reach the device over BLE. '
+          'Please move closer and tap Try again.';
+    }
+    if (s.contains('android-code: 257') || s.contains('CONNECTION_LIMIT_EXCEEDED')) {
+      return 'Too many Bluetooth connections. Disconnect another device and try again.';
+    }
+    if (s.toLowerCase().contains('timeout')) {
+      return 'Connection timed out. Make sure the device is powered on and nearby.';
+    }
+    if (s.toLowerCase().contains('cancel')) return 'The connection was canceled.';
+    if (s.toLowerCase().contains('null gatt')) {
       return 'This device does not expose a GATT server — try a different one.';
     }
     return 'Could not connect: $e';

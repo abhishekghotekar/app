@@ -80,9 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
         expiresIn: 3600,
         user: const AuthUser(
           id: 'mock_user_id',
-          firstName: 'Developer',
-          lastName: 'User',
-          email: 'dev@example.com',
+          firstName: 'Rao',
+          lastName: 'Ghuge',
+          email: 'rao.ghuge@gmail.com',
           phone: '1234567890',
           status: 'active',
         ),
