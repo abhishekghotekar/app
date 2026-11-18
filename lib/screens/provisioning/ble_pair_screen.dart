@@ -10,6 +10,7 @@ import '../../theme/app_text_styles.dart';
 import '../../widgets/app_app_bar.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/secondary_button.dart';
+import '../../widgets/ghost_button.dart';
 import 'wifi_setup_screen.dart';
 
 /// The name prefix the CVAI Pi/Mac peripheral advertises with.
@@ -123,7 +124,21 @@ class _BlePairScreenState extends State<BlePairScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: 'Pair Device', showBack: true),
+      appBar: AppAppBar(
+        title: 'Pair Device',
+        showBack: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => WifiSetupScreen(device: widget.device),
+              ),
+            ),
+            child: const Text('Skip', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -307,6 +322,15 @@ class _BlePairScreenState extends State<BlePairScreen> {
               label: 'Back to scan',
               icon: LucideIcons.arrowLeft,
               onPressed: () => Navigator.of(context).pop(),
+            ),
+            const SizedBox(height: 10),
+            GhostButton(
+              label: 'Proceed to Wi-Fi setup anyway',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => WifiSetupScreen(device: widget.device),
+                ),
+              ),
             ),
           ],
         );

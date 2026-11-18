@@ -11,6 +11,7 @@ import '../../widgets/ghost_button.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/secondary_button.dart';
 import '../dashboard/home_screen.dart';
+import '../provisioning/ble_scan_screen.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController(text: 'rao.ghuge@gmail.com');
-  final _password = TextEditingController(text: 'Raoghuge@2025');
+  final _password = TextEditingController(text: 'Rao@2050');
   bool _obscure = true;
   bool _loading = false;
 
@@ -47,9 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
       await AuthStorage.saveSession(result);
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const BleScanScreen()),
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -89,9 +90,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
     if (!mounted) return;
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const BleScanScreen()),
+    );
   }
 
   @override
@@ -152,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 32),
                         AppTextField(
                           label: 'Email',
-                          hint: 'you@school.edu',
+                          hint: 'rao.ghuge@gmail.com',
                           prefixIcon: LucideIcons.mail,
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
@@ -160,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                         AppTextField(
                           label: 'Password',
-                          hint: 'Enter your password',
+                          hint: 'Rao@2050',
                           prefixIcon: LucideIcons.lock,
                           controller: _password,
                           obscure: _obscure,

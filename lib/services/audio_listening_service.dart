@@ -13,7 +13,7 @@ class AudioListeningService {
   static bool _isStopping = false;
 
   static const String _defaultWsUrl =
-      'wss://baap-tunnel-13-201-117-192.nip.io/t/62fbc2f06d0d721c/mic/ws';
+      'wss://2092-59-97-150-29.ngrok-free.app/mic/ws';
 
   /// Notifies listeners when audio playback starts or stops.
   static final ValueNotifier<bool> isListeningNotifier = ValueNotifier<bool>(

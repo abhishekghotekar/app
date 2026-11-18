@@ -53,6 +53,10 @@ class BleService {
   // the pair screen. Keyed by the bare MAC / remote-id string.
   static final Map<String, BluetoothDevice> _bleDeviceCache = {};
 
+  // Cache of known device names from bonded/paired OS records or previous scans
+  // so a device connected in Android settings never loses its name.
+  static final Map<String, String> _bondedNameCache = {};
+
   // Pair-attempt state, broadcast to the pair screen. Keyed by `kind:id`
   // so a BLE attempt and a Classic attempt on the same MAC don't collide.
   static final Map<String, StreamController<BleConnectionState>>
@@ -191,24 +195,11 @@ class BleService {
     _loggedDiscovered.clear();
     _emitResults();
 
-    // Seed with paired classic devices (only when we're not filtering).
-    if (_classicSupported && !cvaiOnly) {
-      try {
-        final bonded = await _classic.bondedDevices;
-        if (bonded != null) {
-          for (final d in bonded) {
-            _ingestClassic(d, bonded: true);
-          }
-          _log('scan:seeded bondedClassic=${bonded.length}');
-          _emitResults();
-        }
-      } catch (_) {
-        // bondedDevices can throw if permissions are not granted yet — the
-        // live scan will still pick them up.
-      }
-    }
+    // Immediately seed all bonded and connected devices from the phone's OS
+    // so paired devices (like Raspberry Pi) appear right away with their full names.
+    await _seedBondedDevices();
 
-    // BLE scan.
+    // Pure BLE (Bluetooth Low Energy / GATT) scan via FlutterBluePlus ONLY
     if (FlutterBluePlus.isScanningNow) {
       await FlutterBluePlus.stopScan();
     }
@@ -217,17 +208,6 @@ class BleService {
       androidUsesFineLocation: _needsFineLocationPermission,
       androidCheckLocationServices: _needsFineLocationPermission,
     );
-
-    // Classic scan — kicked off in parallel when we're showing everything.
-    // Skip in CVAI-only mode since classic doesn't carry service UUIDs.
-    if (_classicSupported && !cvaiOnly) {
-      try {
-        _classic.stopScan();
-      } catch (_) {}
-      try {
-        _classic.startScan();
-      } catch (_) {}
-    }
 
     try {
       await bleScan;
@@ -239,6 +219,95 @@ class BleService {
       _log('scan:error $e');
       throw BleException(_humanizeScanError(e));
     }
+  }
+
+  /// Seeds paired/bonded and system-connected Bluetooth devices from Android / OS.
+  /// This ensures that if the Raspberry Pi was paired via Android Bluetooth Settings,
+  /// its name and MAC are immediately present and can be connected via BLE GATT.
+  static Future<void> _seedBondedDevices() async {
+    _log('scan:seeding bonded and connected devices from OS...');
+
+    // 1. Ingest FlutterBluePlus bonded devices
+    try {
+      final bleBonded = await FlutterBluePlus.bondedDevices;
+      _log('scan:seeded bondedBle=${bleBonded.length}');
+      for (final d in bleBonded) {
+        final id = d.remoteId.str.trim();
+        if (id.isEmpty) continue;
+        _bleDeviceCache[id] = d;
+        final name = (d.platformName.isNotEmpty ? d.platformName : d.advName).trim();
+        if (name.isNotEmpty) _bondedNameCache[id] = name;
+        _ingestBondedDevice(id: id, name: name);
+      }
+    } catch (e) {
+      _log('scan:seed BLE bonded error: $e');
+    }
+
+    // 2. Ingest FlutterBluePlus system-connected devices
+    try {
+      final systemDevs = await FlutterBluePlus.systemDevices([]);
+      _log('scan:seeded systemBle=${systemDevs.length}');
+      for (final d in systemDevs) {
+        final id = d.remoteId.str.trim();
+        if (id.isEmpty) continue;
+        _bleDeviceCache[id] = d;
+        final name = (d.platformName.isNotEmpty ? d.platformName : d.advName).trim();
+        if (name.isNotEmpty) _bondedNameCache[id] = name;
+        _ingestBondedDevice(id: id, name: name);
+      }
+    } catch (e) {
+      _log('scan:seed system devices error: $e');
+    }
+
+    // 3. Ingest Classic bonded devices from Android OS
+    if (_classicSupported) {
+      try {
+        final classicBonded = await _classic.bondedDevices;
+        if (classicBonded != null) {
+          _log('scan:seeded bondedClassic=${classicBonded.length}');
+          for (final d in classicBonded) {
+            final id = d.address.trim();
+            if (id.isEmpty) continue;
+            final rawName = (d.alias?.isNotEmpty ?? false) ? d.alias! : (d.name ?? '');
+            final name = rawName.trim();
+            if (name.isNotEmpty) _bondedNameCache[id] = name;
+            _bleDeviceCache[id] = BluetoothDevice(remoteId: DeviceIdentifier(id));
+            _ingestBondedDevice(id: id, name: name);
+          }
+        }
+      } catch (e) {
+        _log('scan:seed classic bonded error: $e');
+      }
+    }
+
+    _emitResults();
+  }
+
+  static void _ingestBondedDevice({required String id, required String name}) {
+    if (id.isEmpty) return;
+    final cachedName = _bondedNameCache[id] ?? '';
+    final resolvedName = name.isNotEmpty ? name : cachedName;
+    final existing = _devices['ble:$id'];
+    final finalName = resolvedName.isNotEmpty
+        ? resolvedName
+        : (existing?.name.isNotEmpty ?? false)
+            ? existing!.name
+            : '';
+
+    final label = _sanitizeLogText(
+      finalName.isNotEmpty ? finalName : 'Unnamed device',
+      max: 80,
+    );
+    _log('scan:bonded device ingested "$label" ($id)');
+
+    _devices['ble:$id'] = ScannedDevice(
+      id: id,
+      name: finalName,
+      kind: BluetoothKind.ble,
+      rssi: existing?.rssi ?? -45,
+      isBonded: true,
+      serviceUuids: existing?.serviceUuids ?? const [],
+    );
   }
 
   static String _humanizeScanError(Object e) {
@@ -297,35 +366,8 @@ class BleService {
     ctl.add(BleConnectionState.connecting);
     _log('state:connecting ${_deviceTag(device)}');
 
-    if (device.kind == BluetoothKind.ble) {
-      await _connectBle(device, ctl);
-    } else {
-      await _bondClassic(device, ctl);
-      _log('classic bond successful, now connecting BLE GATT for provisioning...');
-
-      // After a Classic bond the BLE GATT stack on the remote device may not
-      // be ready immediately. Android error 133 (ANDROID_SPECIFIC_ERROR) is
-      // the typical symptom. Retry up to 3 times with increasing back-off.
-      const maxGattRetries = 3;
-      for (int attempt = 1; attempt <= maxGattRetries; attempt++) {
-        final waitMs = attempt * 1500; // 1.5 s, 3 s, 4.5 s
-        _log('BLE GATT attempt $attempt/$maxGattRetries — waiting ${waitMs}ms before connect...');
-        await Future<void>.delayed(Duration(milliseconds: waitMs));
-        try {
-          await _connectBle(device, ctl);
-          _log('BLE GATT connected on attempt $attempt');
-          return; // success — exit connect()
-        } catch (e) {
-          if (attempt == maxGattRetries) {
-            _log('BLE GATT failed after $maxGattRetries attempts: $e');
-            rethrow; // surface the error to the UI
-          }
-          _log('BLE GATT attempt $attempt failed ($e) — retrying...');
-          // Reset the controller state back to connecting for the next attempt
-          if (!ctl.isClosed) ctl.add(BleConnectionState.connecting);
-        }
-      }
-    }
+    // Pure BLE (Bluetooth Low Energy / GATT) connection
+    await _connectBle(device, ctl);
   }
 
   /// Drop an active connection. No-op for Classic (the OS holds the bond).
@@ -417,9 +459,17 @@ class BleService {
       if (!ctl.isClosed) ctl.add(BleConnectionState.failed);
       _log('state:failed ${_deviceTag(device)} error=$e');
       final msg = e.toString();
+      if (msg.contains('android-code: 147') ||
+          msg.contains('GATT_CONNECTION_TIMEOUT') ||
+          msg.contains('Timed out after 20s')) {
+        throw BleException(
+          'BLE GATT connection timed out (Code 147). '
+          'Please ensure the BLE provisioning service (ble_provisioning.py) is running on the Raspberry Pi.',
+        );
+      }
       if (msg.contains('android-code: 133') || msg.contains('ANDROID_SPECIFIC_ERROR')) {
         throw BleException(
-          'Could not reach the device over BLE. '
+          'Could not reach the device over BLE (Error 133). '
           'Please move closer and tap Try again.',
         );
       }
@@ -508,26 +558,30 @@ class BleService {
     required String ssid,
     required String password,
     String? token,
+    String? clientId,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
-    final jsonMap = {
-      'ssid': ssid,
-      'password': password,
-      'psk': password,
-      'pass': password,
-      'pwd': password,
-      if (token != null && token.isNotEmpty) ...{
-        'token': token,
-        'access_token': token,
-        'accessToken': token,
+
+    String? cleanToken;
+    if (token != null && token.trim().isNotEmpty) {
+      cleanToken = token.trim();
+      if (cleanToken.startsWith('Bearer ')) {
+        cleanToken = cleanToken.substring(7).trim();
       }
+    }
+
+    final jsonMap = <String, dynamic>{
+      'ssid': ssid.trim(),
+      'password': password.trim(),
+      if (cleanToken != null && cleanToken.isNotEmpty) 'token': cleanToken,
+      if (clientId != null && clientId.isNotEmpty) 'client_id': clientId.trim(),
     };
     final jsonStr = jsonEncode(jsonMap);
-    _log('Sending WiFi credentials JSON: $jsonStr');
+    _log('Sending WiFi credentials & login Bearer token JSON (${jsonStr.length} B): $jsonStr');
     final payload = utf8.encode(jsonStr);
     try {
       await char.write(payload, allowLongWrite: true);
-      _log('WiFi credentials successfully sent over BLE.');
+      _log('WiFi credentials & login token successfully sent over BLE.');
     } catch (e) {
       throw BleException('Could not send credentials: $e');
     }
@@ -541,12 +595,27 @@ class BleService {
   static Future<void> sendToken(
     ScannedDevice device, {
     required String token,
+    String? clientId,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
-    const chunkSize = 400; // safe margin under 512-byte MTU
+    const chunkSize = 380; // safe margin under 512-byte MTU
 
-    if (token.length <= chunkSize) {
-      final jsonStr = jsonEncode({'token': token});
+    String cleanToken = token.trim();
+    if (cleanToken.startsWith('Bearer ')) {
+      cleanToken = cleanToken.substring(7).trim();
+    }
+
+    if (cleanToken.length <= chunkSize) {
+      final jsonStr = jsonEncode({
+        'token': cleanToken,
+        'access_token': cleanToken,
+        'accessToken': cleanToken,
+        'bearer_token': 'Bearer $cleanToken',
+        if (clientId != null && clientId.isNotEmpty) ...{
+          'client_id': clientId,
+          'clientId': clientId,
+        },
+      });
       _log('Sending token (${jsonStr.length} B)');
       try {
         await char.write(utf8.encode(jsonStr));
@@ -556,16 +625,19 @@ class BleService {
       }
     } else {
       // Token is a long JWT — split into chunks
-      _log('Token too long (${token.length} chars) — chunking.');
+      _log('Token too long (${cleanToken.length} chars) — chunking.');
       final chunks = <String>[];
-      for (var i = 0; i < token.length; i += chunkSize) {
-        chunks.add(token.substring(i, (i + chunkSize).clamp(0, token.length)));
+      for (var i = 0; i < cleanToken.length; i += chunkSize) {
+        chunks.add(cleanToken.substring(i, (i + chunkSize).clamp(0, cleanToken.length)));
       }
       for (var i = 0; i < chunks.length; i++) {
         final jsonStr = jsonEncode({
           'token_chunk': chunks[i],
+          'token': chunks[i],
+          'access_token': chunks[i],
           'chunk': i,
           'total': chunks.length,
+          if (clientId != null && clientId.isNotEmpty) 'client_id': clientId,
         });
         _log('Token chunk ${i + 1}/${chunks.length} (${jsonStr.length} B)');
         try {
@@ -619,8 +691,9 @@ class BleService {
         _log('      * Characteristic: ${c.uuid.str}');
       }
     }
+    final targetServices = CvaiBle.serviceUuids.map((u) => u.toLowerCase()).toSet();
     var svc = services.where(
-      (s) => s.uuid.str.toLowerCase() == CvaiBle.serviceUuid.toLowerCase(),
+      (s) => targetServices.contains(s.uuid.str.toLowerCase()),
     );
     if (svc.isEmpty) {
       _log('CVAI service not found in cache. Clearing Android GATT cache and retrying...');
@@ -636,7 +709,7 @@ class BleService {
           }
         }
         svc = services.where(
-          (s) => s.uuid.str.toLowerCase() == CvaiBle.serviceUuid.toLowerCase(),
+          (s) => targetServices.contains(s.uuid.str.toLowerCase()),
         );
       } catch (e) {
         _log('Failed to clear GATT cache: $e');
@@ -648,20 +721,60 @@ class BleService {
         'not match. Pair the right one.',
       );
     }
-    final chars = svc.first.characteristics.where(
-      (c) => c.uuid.str.toLowerCase() == charUuid.toLowerCase(),
-    );
-    if (chars.isEmpty) {
-      throw BleException(
-        'Device is missing a required characteristic ($charUuid). '
-        'It may be running an incompatible firmware.',
-      );
+
+    final selectedService = svc.first;
+    // Map charUuid to allowed candidate UUIDs
+    final candidates = <String>{charUuid.toLowerCase()};
+    if (charUuid.toLowerCase() == CvaiBle.wifiListCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyWifiListCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.wifiListCharUuid.toLowerCase(),
+        CvaiBle.legacyWifiListCharUuid.toLowerCase(),
+      ]);
+    } else if (charUuid.toLowerCase() == CvaiBle.wifiCredsCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyWifiCredsCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.wifiCredsCharUuid.toLowerCase(),
+        CvaiBle.legacyWifiCredsCharUuid.toLowerCase(),
+      ]);
+    } else if (charUuid.toLowerCase() == CvaiBle.statusCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyStatusCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.statusCharUuid.toLowerCase(),
+        CvaiBle.legacyStatusCharUuid.toLowerCase(),
+      ]);
     }
-    return chars.first;
+
+    final chars = selectedService.characteristics.where(
+      (c) => candidates.contains(c.uuid.str.toLowerCase()),
+    );
+    if (chars.isNotEmpty) {
+      return chars.first;
+    }
+
+    // Fallback: match by position if characteristics list has 3 items
+    if (candidates.contains(CvaiBle.wifiListCharUuid.toLowerCase()) &&
+        selectedService.characteristics.isNotEmpty) {
+      return selectedService.characteristics[0];
+    }
+    if (candidates.contains(CvaiBle.wifiCredsCharUuid.toLowerCase()) &&
+        selectedService.characteristics.length > 1) {
+      return selectedService.characteristics[1];
+    }
+    if (candidates.contains(CvaiBle.statusCharUuid.toLowerCase()) &&
+        selectedService.characteristics.length > 2) {
+      return selectedService.characteristics[2];
+    }
+
+    throw BleException(
+      'Device is missing a required characteristic ($charUuid). '
+      'It may be running an incompatible firmware.',
+    );
   }
 
   static List<WifiNetwork> _decodeWifiList(List<int> bytes) {
     final str = utf8.decode(bytes, allowMalformed: true).trim();
+    _log('Received raw WiFi list: "$str"');
     if (str.isEmpty) return const [];
     dynamic data;
     try {
@@ -677,6 +790,11 @@ class BleService {
       if (item is Map) {
         final net = WifiNetwork.fromJson(item.cast<String, dynamic>());
         if (net.ssid.isNotEmpty) list.add(net);
+      } else if (item is String && item.trim().isNotEmpty) {
+        list.add(WifiNetwork(
+          ssid: item.trim(),
+          secured: true,
+        ));
       }
     }
     return list;
@@ -775,20 +893,39 @@ class BleService {
     if (_wired) return;
     _wired = true;
 
+    // Immediately seed bonded/paired devices from the OS
+    scheduleMicrotask(() => _seedBondedDevices());
+
     FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        final advName = r.advertisementData.advName;
-        final name =
-            (advName.isNotEmpty ? advName : r.device.platformName).trim();
         final id = r.device.remoteId.str;
         _bleDeviceCache[id] = r.device;
+
+        final existing = _devices['ble:$id'];
+
+        // Extract name carefully from advName, platformName, bondedNameCache, or existing name!
+        final advName = r.advertisementData.advName.trim();
+        final platName = r.device.platformName.trim();
+        String name = advName.isNotEmpty ? advName : platName;
+        if (name.isEmpty && _bondedNameCache.containsKey(id) && _bondedNameCache[id]!.isNotEmpty) {
+          name = _bondedNameCache[id]!;
+        }
+        if (name.isEmpty && existing != null && existing.name.isNotEmpty) {
+          name = existing.name; // Preserve known name! Never overwrite with empty
+        }
+        if (name.isNotEmpty) {
+          _bondedNameCache[id] = name;
+        }
+
+        final isBonded = existing?.isBonded == true || _bondedNameCache.containsKey(id);
+
         final uuids = r.advertisementData.serviceUuids
             .map((g) => g.str.toLowerCase())
             .toList(growable: false);
+
         // Merge with any previously-seen UUIDs for this device — across
         // ScanResponse packets the advertisement contents can vary, so we
         // accumulate the union of what we've ever seen.
-        final existing = _devices['ble:$id'];
         final mergedUuids = existing == null
             ? uuids
             : <String>{...existing.serviceUuids, ...uuids}
@@ -800,6 +937,8 @@ class BleService {
         );
         final isCvaiCandidate =
             label.toUpperCase().startsWith('CVAI') ||
+            label.toLowerCase().contains('raspberry') ||
+            label.toLowerCase().contains('pi') ||
             mergedUuids.contains(CvaiBle.serviceUuid.toLowerCase());
         if (_loggedDiscovered.add(uniqueKey) &&
             (_logAllDiscoveredDevices || isCvaiCandidate)) {
@@ -813,6 +952,7 @@ class BleService {
           name: name,
           kind: BluetoothKind.ble,
           rssi: r.rssi,
+          isBonded: isBonded,
           serviceUuids: mergedUuids,
         );
       }
@@ -820,20 +960,8 @@ class BleService {
     });
     FlutterBluePlus.isScanning.listen((on) {
       _bleScanning = on;
-      _scanningController.add(_bleScanning || _classicScanning);
+      _scanningController.add(_bleScanning);
     });
-
-    if (_classicSupported) {
-      try {
-        _classic.scanResults.listen((d) => _ingestClassic(d));
-        _classic.isScanning.listen((on) {
-          _classicScanning = on;
-          _scanningController.add(_bleScanning || _classicScanning);
-        });
-      } catch (_) {
-        // Plugin not registered on this platform — silently skip classic.
-      }
-    }
   }
 
   static void _ingestClassic(fbc.BluetoothDevice d, {bool bonded = false}) {

@@ -83,6 +83,21 @@ class UserListApi {
           'Authorization': 'Bearer $token',
         },
       ).timeout(const Duration(seconds: 20));
+
+      // If /face/client/{clientId}/users returns 404, fallback to /client/{clientId}/users
+      if (response.statusCode == 404) {
+        final fallbackUri = Uri.parse(
+          '${FaceRegisterApi.baseUrl}/client/$activeClientId/users',
+        ).replace(queryParameters: queryParams);
+        response = await http.get(
+          fallbackUri,
+          headers: {
+            'accept': 'application/json',
+            'ngrok-skip-browser-warning': 'true',
+            'Authorization': 'Bearer $token',
+          },
+        ).timeout(const Duration(seconds: 20));
+      }
     } catch (e) {
       throw UserListException('Network error: $e');
     }

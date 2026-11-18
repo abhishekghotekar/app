@@ -21,11 +21,9 @@ void main() async {
   runApp(CvaiApp(loggedIn: loggedIn));
 }
 
-
 class CvaiApp extends StatelessWidget {
-  const CvaiApp({super.key, required this.loggedIn});
+  const CvaiApp({super.key, this.loggedIn = false});
 
-  /// Whether a saved session was found — if so, skip the login screen.
   final bool loggedIn;
 
   @override

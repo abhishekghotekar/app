@@ -27,6 +27,7 @@ class WifiNetwork {
 }
 
 /// Lifecycle of a WiFi provisioning attempt on the device.
+// ignore: constant_identifier_names
 enum ProvisionState {
   /// Device is trying to associate with the chosen SSID.
   connecting,
@@ -72,15 +73,34 @@ class ProvisionStatus {
   final String? message;
 
   factory ProvisionStatus.fromJson(Map<String, dynamic> json) {
-    // Normalize: "WIFI_OK" → "wifi_ok", "WIFI_FAIL" → "wifi_fail", etc.
-    final raw = (json['state'] as String? ?? 'failed')
+    // Supports various Raspberry Pi backend formats:
+    // {"connected": true, "ssid": "...", "ip": "192.168.54.230", "status": "connected", "last_result": "success"}
+    // or {"state": "connected"} / {"state": "wifi_ok"}
+    final bool isExplicitlyConnected = json['connected'] == true ||
+        (json['last_result'] as String?)?.toLowerCase() == 'success';
+
+    final raw = (json['state'] as String? ??
+            json['status'] as String? ??
+            (isExplicitlyConnected ? 'connected' : 'failed'))
         .toLowerCase()
         .trim()
         .replaceAll('-', '_');
-    final state = ProvisionState.values.firstWhere(
-      (s) => s.name == raw,
-      orElse: () => ProvisionState.failed,
-    );
+
+    ProvisionState state;
+    if (isExplicitlyConnected || raw == 'connected' || raw == 'success') {
+      state = ProvisionState.connected;
+    } else if (raw == 'wifi_ok' || raw == 'wifiok') {
+      state = ProvisionState.wifi_ok;
+    } else if (raw == 'connecting') {
+      state = ProvisionState.connecting;
+    } else if (raw == 'request_token' || raw == 'requesttoken' || raw == 'token') {
+      state = ProvisionState.request_token;
+    } else if (raw == 'wifi_fail' || raw == 'wififail') {
+      state = ProvisionState.wifi_fail;
+    } else {
+      state = ProvisionState.failed;
+    }
+
     return ProvisionStatus(
       state: state,
       ip: (json['ip'] as String?)?.trim(),

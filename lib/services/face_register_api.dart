@@ -27,17 +27,19 @@ class FaceRegisterApi {
 
   static Future<String?> _getToken() async {
     final token = await AuthStorage.accessToken();
-    if (token == null || token.isEmpty || token == 'mock_access_token_from_skip_login') {
+    if (token == null ||
+        token.isEmpty ||
+        token == 'mock_access_token_from_skip_login') {
       return AttendanceApi.fallbackToken;
     }
     return token;
   }
 
   /// Change this to your current ngrok URL.
-  static const String baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
+  static const String baseUrl = 'https://ad3a-59-97-150-29.ngrok-free.app/';
 
   /// The client (organisation) ID for all face API calls.
-  static const String clientId = '571bf643-60d5-4e9c-9c99-b8a52ca1832a';
+  static String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';
 
   static Map<String, dynamic>? _parseJwt(String token) {
     try {
@@ -58,21 +60,6 @@ class FaceRegisterApi {
   }
 
   static Future<String> getActiveClientId() async {
-    try {
-      final token = await AuthStorage.accessToken();
-      if (token != null && token.isNotEmpty) {
-        final decoded = _parseJwt(token);
-        if (decoded != null && decoded.containsKey('clients')) {
-          final clients = decoded['clients'] as Map<String, dynamic>?;
-          if (clients != null && clients.isNotEmpty) {
-            if (clients.containsKey(clientId)) {
-              return clientId;
-            }
-            return clients.keys.first;
-          }
-        }
-      }
-    } catch (_) {}
     return clientId;
   }
 
@@ -186,7 +173,7 @@ class FaceRegisterApi {
     // 1. Fetch all users (all registration statuses)
     late http.Response listResponse;
     try {
-      final uri = Uri.parse('$baseUrl/face/client/$activeClientId/users').replace(
+      var uri = Uri.parse('$baseUrl/face/client/$activeClientId/users').replace(
         queryParameters: {
           'page': '1',
           'limit': '200',
@@ -205,6 +192,28 @@ class FaceRegisterApi {
             },
           )
           .timeout(const Duration(seconds: 30));
+
+      if (listResponse.statusCode == 404) {
+        final fallbackUri = Uri.parse('$baseUrl/client/$activeClientId/users')
+            .replace(
+              queryParameters: {
+                'page': '1',
+                'limit': '200',
+                'status': 'active',
+                'registration_status': 'all',
+              },
+            );
+        listResponse = await http
+            .get(
+              fallbackUri,
+              headers: {
+                'accept': 'application/json',
+                'ngrok-skip-browser-warning': 'true',
+                if (token != null) 'Authorization': 'Bearer $token',
+              },
+            )
+            .timeout(const Duration(seconds: 30));
+      }
     } catch (e) {
       throw FaceRegisterException('Network error fetching user list.\n($e)');
     }
@@ -280,20 +289,24 @@ class FaceRegisterApi {
     final uri = Uri.parse('$baseUrl/face/config');
     final token = await _getToken();
     try {
-      final response = await http.get(
-        uri,
-        headers: {
-          'accept': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'accept': 'application/json',
+              'ngrok-skip-browser-warning': 'true',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final decoded = jsonDecode(response.body) as Map<String, dynamic>;
         return {
-          'weapon_detection_enabled': decoded['weapon_detection_enabled'] as bool? ?? false,
-          'wanted_detection_enabled': decoded['wanted_detection_enabled'] as bool? ?? false,
+          'weapon_detection_enabled':
+              decoded['weapon_detection_enabled'] as bool? ?? false,
+          'wanted_detection_enabled':
+              decoded['wanted_detection_enabled'] as bool? ?? false,
           'attendance_enabled': decoded['attendance_enabled'] as bool? ?? false,
         };
       }
@@ -322,17 +335,21 @@ class FaceRegisterApi {
 
     late http.Response response;
     try {
-      response = await http.post(
-        uri,
-        headers: {
-          'accept': 'application/json',
-          'content-type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 15));
+      response = await http
+          .post(
+            uri,
+            headers: {
+              'accept': 'application/json',
+              'content-type': 'application/json',
+              if (token != null) 'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 15));
     } catch (e) {
-      throw FaceRegisterException('Network error while updating configuration.\n($e)');
+      throw FaceRegisterException(
+        'Network error while updating configuration.\n($e)',
+      );
     }
 
     if (response.statusCode == 200 || response.statusCode == 201) {

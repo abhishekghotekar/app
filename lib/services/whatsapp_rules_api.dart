@@ -6,7 +6,7 @@ import 'attendance_api.dart';
 
 /// API service for the WhatsApp Rules backend.
 ///
-/// Base URL  : https://baap-tunnel-13-201-117-192.nip.io
+/// Base URL  : https://2092-59-97-150-29.ngrok-free.app
 /// Endpoints :
 ///   GET    /whatsapp/rules          → list all rules
 ///   POST   /whatsapp/rules          → create a rule
@@ -17,7 +17,7 @@ import 'attendance_api.dart';
 class WhatsAppRulesApi {
   WhatsAppRulesApi._();
 
-  static const String _baseUrl = 'https://baap-tunnel.150-241-245-243.nip.io';
+  static const String _baseUrl = 'https://2092-59-97-150-29.ngrok-free.app';
   static const String _rulesPath = '/whatsapp/rules';
 
   static const Map<String, String> _defaultHeaders = {
@@ -25,6 +25,19 @@ class WhatsAppRulesApi {
     'content-type': 'application/json',
     'ngrok-skip-browser-warning': 'true',
   };
+
+  static Future<Map<String, String>> _getHeaders() async {
+    final sessionToken = await AuthStorage.accessToken();
+    final token = (sessionToken == null ||
+            sessionToken.isEmpty ||
+            sessionToken == 'mock_access_token_from_skip_login')
+        ? AttendanceApi.fallbackToken
+        : sessionToken;
+    return {
+      ..._defaultHeaders,
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
 
   /// Builds the URL for a specific rule id.
   static Uri _ruleUri(String id) =>
@@ -56,11 +69,20 @@ class WhatsAppRulesApi {
     }
 
     try {
-      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-      return data
-          .whereType<Map<String, dynamic>>()
-          .map(WhatsAppRule.fromJson)
-          .toList();
+      final decoded = jsonDecode(response.body);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map<String, dynamic>>()
+            .map(WhatsAppRule.fromJson)
+            .toList();
+      } else if (decoded is Map<String, dynamic>) {
+        final list = (decoded['data'] ?? decoded['rules'] ?? []) as List<dynamic>;
+        return list
+            .whereType<Map<String, dynamic>>()
+            .map(WhatsAppRule.fromJson)
+            .toList();
+      }
+      return [];
     } catch (e) {
       throw WhatsAppRulesException('Failed to parse rules response.\n($e)');
     }

@@ -17,7 +17,7 @@ class AudioStreamService {
   static int _totalBytesSent = 0;
 
   static const String _defaultWsUrl =
-      'wss://baap-tunnel-13-201-117-192.nip.io/t/62fbc2f06d0d721c/audio/stream';
+      'wss://2092-59-97-150-29.ngrok-free.app/audio/stream';
 
   /// Notifies listeners when streaming starts or stops.
   static final ValueNotifier<bool> isStreamingNotifier = ValueNotifier<bool>(
@@ -106,7 +106,9 @@ class AudioStreamService {
           if (_webSocket != null && _webSocket!.readyState == WebSocket.open) {
             _webSocket!.add(data);
             _totalBytesSent += data.length;
-            debugPrint('[AudioStream] Sent ${data.length} bytes to server. Total sent: $_totalBytesSent bytes');
+            if (_totalBytesSent % 50000 < data.length) {
+              debugPrint('[AudioStream] Streamed $_totalBytesSent bytes');
+            }
           }
         },
         onError: (err) {

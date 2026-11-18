@@ -11,9 +11,9 @@ class AttendanceApi {
 
   // Fallback token for testing/development if local session is empty
   static const String fallbackToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZDRiMGIxZTktMDY1Ni00M2ZkLTlkNmEtZmIzYjViYmUzNWExIiwidXNlcl90eXBlIjoiQWRtaW4iLCJjbGllbnRzIjp7ImI1ZGE2ZWU5LTZjMDYtNGE0Ny05MjI4LTk2YjZkZDkzOGExOCI6ImUyMTA1MzNhLTcyMDEtNDQzNC05YTFmLTQxNzAxZjAwZTQ3NSIsIjZjZjY1YjdkLTU0MDAtNGM4NC1hNTZkLWM3YmFkMmUzYjc5ZCI6IjhmM2MxNzg5LTQxODYtNDI2NS1hZTExLWY1NjdkZDgxZDhjMSIsImYwNmNkMzVmLTBmNDgtNGE0Zi1iMDY5LTZjZGY3MDc2ZGE2OSI6IjlhZjE1MmM1LTA0YTctNGFmMS04Y2QzLTk3OTBiY2VjODBiNyIsIjE0Njc4MGRhLTFlNGItNGYwOC1iOGQxLTIxNDBjZTVhZjAyNyI6ImYxY2IzMTI1LTcyYzYtNDE5OS05YjI3LTg0NGM3MGY3NDEwZSIsImZkMzY1OGZjLThiMzQtNDVhMi05ZDk1LTkyN2Q4ODg5NTljMCI6IjRiOTVmZDM4LTk3MzMtNDQyZS04OWI2LWExZWJjODNmNWJkZSIsIjU4M2QwYTMxLTliZDMtNDFkOC04ZWViLTE3Yjg0YmFlZDk5YSI6ImJjNjBkZGRjLTBhZTctNDEzMS1hMDY1LThiY2IxY2JkZTFlNCIsImIwNGZkNTViLWExNjAtNDI4Ny1iNGJiLTI4MmNiNWI1MDk5ZiI6IjE4YTgzNjY0LTQ1ZjQtNDczNi1iYTBlLTlmNjNiOGE5ZGQ5YSIsImQ5YzI2MzhiLWMwNTctNGE4My04ODYzLWNkY2UxYzJkYzQ2MCI6ImMzOGI5YTJlLTdhYmQtNGE5My1iZmExLTJjODY0YTVhNTc3OCIsImJkMjNhMzBiLTgyMmQtNDQwOC1hNDgwLTlhZWNkMWNmODlmNCI6IjNlN2JkNTZiLTg0NGEtNGYyYy05NmMxLTcwZjA0MTIxZGFmZCIsIjJhMTdlNDI2LWQ1ZDItNGI5Ni1hNDU4LWI0OTE3ODRjMjNlOCI6IjE1MDEyYmQ5LWZhNjItNGNmZC1hMmY5LTk0ZWY2NTAyZTQwMCIsIjU3MWJmNjQzLTYwZDUtNGU5Yy05Yzk5LWI4YTUyY2ExODMyYSI6IjU4YmM1MGU0LTc0ZTEtNGVjNC05YzY5LTM0YTUzYjhjOWM5MCJ9LCJ0b2tlbl92ZXJzaW9uIjo0LCJpYXQiOjE3Nzk4NjcwMjUsImV4cCI6MTc3OTk1MzQyNX0.9-hNpvyyItp6jBjAXLMzAOYbMpmk8QqAQagIW1e7BwY';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYTJhMjAzMzUtNmU1ZC00ODU5LTg0ODctM2Y0YzUzZGNmNjMzIiwidXNlcl90eXBlIjoiQWRtaW4iLCJjbGllbnRzIjp7IjVkODVjOTRkLWE4YTctNDQ5YS05MzljLTIxMjQwOTJjNzRhMCI6IjM0ZjA3MzYwLTMzMGYtNDU2Zi1hZDMxLWIwNDM3NTNkZWM5NyIsIjZjZjY1YjdkLTU0MDAtNGM4NC1hNTZkLWM3YmFkMmUzYjc5ZCI6IjRmNjRiNDFlLTI0OTItNGE0Ny1hZTQyLTI5YTA2ZGM3ZTU1NSIsImJhZDdjODM3LTZkNWQtNGRjMC1iNzA0LWVmOGI3NzM1MjQwYiI6IjFmNTczODJhLWVmMzgtNGUzNS05MTU3LTg0YmE1ZDhkMmU5MyIsImY0MGNmMjM5LTIyYTAtNDQ3NC05ZmVjLTVhNTNkOGYxNjg5YSI6ImRiZTZiOWU4LTMzMDAtNDAyNy04MGEwLTJkZWE1NzBhODMzNyIsImY2ZjhkMDUyLTg1YTAtNDdjYy1hYWE3LTY0ZWVkYzgyMTliMyI6IjFhMWFiMzQyLWRmM2EtNGQwNS04ZGYzLWEyNWFlMGUyYjg0YiJ9LCJ0b2tlbl92ZXJzaW9uIjowLCJpYXQiOjE3OTQ4OTM3NDIsImV4cCI6MTc5NTMyNTc0Mn0.d5IB0DlLRT2VdL9qNNwcIvfh9-DiSDK28G-cbH9cIjo';
 
-  static const String clientId = '571bf643-60d5-4e9c-9c99-b8a52ca1832a';
+  static String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';
 
   /// Helper: Decodes JWT payload to access fields (clients map, user_id)
   static Map<String, dynamic>? _parseJwt(String token) {
@@ -61,25 +61,9 @@ class AttendanceApi {
       print('AttendanceApi: Error loading token from storage: $e');
     }
 
-    // Get client ID dynamically from the JWT claims, fallback to standard clientId
-    String activeClientId = clientId;
-    try {
-      final decoded = _parseJwt(token);
-      if (decoded != null && decoded.containsKey('clients')) {
-        final clients = decoded['clients'] as Map<String, dynamic>?;
-        if (clients != null && clients.isNotEmpty) {
-          // If the clients map contains our default client ID, use it. Otherwise, use the first client ID.
-          if (clients.containsKey(clientId)) {
-            activeClientId = clientId;
-          } else {
-            activeClientId = clients.keys.first;
-          }
-          print('AttendanceApi: Dynamic Client ID set: $activeClientId');
-        }
-      }
-    } catch (e) {
-      print('AttendanceApi: Error parsing dynamic client ID from token: $e');
-    }
+    // Always use configured active client ID
+    final String activeClientId = clientId;
+    print('AttendanceApi: Target Client ID is: $activeClientId');
 
     final queryParams = <String, String>{
       'date_in_iso_format': dateStr,
@@ -111,13 +95,33 @@ class AttendanceApi {
 
       print('AttendanceApi: HTTP response code: ${response.statusCode}');
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final Map<String, dynamic> decoded = jsonDecode(response.body);
-        final List<dynamic> data = decoded['data'] as List<dynamic>? ?? [];
+        print('AttendanceApi: Raw response body: ${response.body}');
+        final dynamic decoded = jsonDecode(response.body);
+        List<dynamic> data = [];
+        if (decoded is List) {
+          data = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          if (decoded['data'] is List) {
+            data = decoded['data'] as List<dynamic>;
+          } else if (decoded['data'] is Map<String, dynamic>) {
+            final dataMap = decoded['data'] as Map<String, dynamic>;
+            data = (dataMap['records'] ??
+                    dataMap['items'] ??
+                    dataMap['attendance'] ??
+                    dataMap['users'] ??
+                    []) as List<dynamic>;
+          } else if (decoded['records'] is List) {
+            data = decoded['records'] as List<dynamic>;
+          } else if (decoded['items'] is List) {
+            data = decoded['items'] as List<dynamic>;
+          }
+        }
         print('AttendanceApi: Successfully fetched ${data.length} records');
         return data
+            .whereType<Map<String, dynamic>>()
             .map(
               (json) => AttendanceRecord.fromApiJson(
-                json as Map<String, dynamic>,
+                json,
                 fallbackDate: date,
               ),
             )
@@ -136,36 +140,34 @@ class AttendanceApi {
     }
   }
 
-  /// Fetches all attendance records for a specific user (studentId) over the last 15 days.
+  /// Fetches attendance records for a specific user (studentId) over the last 14 days.
   static Future<List<AttendanceRecord>> fetchUserAttendance({
     required String userId,
   }) async {
-    final List<Future<List<AttendanceRecord>>> futures = [];
     final now = DateTime.now();
-
-    // Fetch records for the last 30 days in parallel using Future.wait
-    for (int i = 0; i < 30; i++) {
-      final queryDate = now.subtract(Duration(days: i));
-      futures.add(
-        fetchAttendance(date: queryDate).catchError((e) {
-          print('AttendanceApi: Error fetching attendance for day $i: $e');
-          return <AttendanceRecord>[];
-        }),
-      );
-    }
-
-    print(
-      'AttendanceApi: Fetching user attendance for the last 30 days in parallel...',
-    );
-    final results = await Future.wait(futures);
+    const daysToFetch = 14;
     final List<AttendanceRecord> userRecords = [];
-    for (final list in results) {
-      final filtered = list.where((r) => r.studentId == userId);
-      userRecords.addAll(filtered);
+
+    // Query in batches of 5 parallel requests to prevent connection flooding
+    for (int i = 0; i < daysToFetch; i += 5) {
+      final futures = <Future<List<AttendanceRecord>>>[];
+      for (int j = i; j < i + 5 && j < daysToFetch; j++) {
+        final queryDate = now.subtract(Duration(days: j));
+        futures.add(
+          fetchAttendance(date: queryDate, limit: 200).catchError((e) {
+            print('AttendanceApi: Error fetching attendance for day $j: $e');
+            return <AttendanceRecord>[];
+          }),
+        );
+      }
+      final results = await Future.wait(futures);
+      for (final list in results) {
+        userRecords.addAll(list.where((r) => r.studentId == userId));
+      }
     }
 
     print(
-      'AttendanceApi: Successfully gathered ${userRecords.length} records for user $userId across the last 30 days',
+      'AttendanceApi: Successfully gathered ${userRecords.length} records for user $userId across the last $daysToFetch days',
     );
     return userRecords;
   }

@@ -31,8 +31,21 @@
 class CvaiBle {
   CvaiBle._();
 
-  static const serviceUuid = 'a07498ca-ad5b-474e-940d-16f1fbe7e8cd';
-  static const wifiListCharUuid = '51ff12bb-3ed8-46e5-b4f9-d64e2fec021b';
-  static const wifiCredsCharUuid = '51ff12bc-3ed8-46e5-b4f9-d64e2fec021b';
-  static const statusCharUuid = '51ff12bd-3ed8-46e5-b4f9-d64e2fec021b';
+  /// Primary service UUID used on Raspberry Pi (active custom service)
+  static const serviceUuid = '12345678-1234-5678-1234-56789abcdef0';
+  static const legacyServiceUuid = 'a07498ca-ad5b-474e-940d-16f1fbe7e8cd';
+
+  static const serviceUuids = [
+    '12345678-1234-5678-1234-56789abcdef0',
+    'a07498ca-ad5b-474e-940d-16f1fbe7e8cd',
+  ];
+
+  static const wifiListCharUuid = '12345678-1234-5678-1234-56789abcdef1';
+  static const legacyWifiListCharUuid = '51ff12bb-3ed8-46e5-b4f9-d64e2fec021b';
+
+  static const wifiCredsCharUuid = '12345678-1234-5678-1234-56789abcdef2';
+  static const legacyWifiCredsCharUuid = '51ff12bc-3ed8-46e5-b4f9-d64e2fec021b';
+
+  static const statusCharUuid = '12345678-1234-5678-1234-56789abcdef3';
+  static const legacyStatusCharUuid = '51ff12bd-3ed8-46e5-b4f9-d64e2fec021b';
 }

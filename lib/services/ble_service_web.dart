@@ -184,14 +184,24 @@ class BleService {
     ScannedDevice device, {
     required String ssid,
     required String password,
+    String? token,
+    String? clientId,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
-    final jsonMap = {
-      'ssid': ssid,
-      'password': password,
-      'psk': password,
-      'pass': password,
-      'pwd': password,
+
+    String? cleanToken;
+    if (token != null && token.trim().isNotEmpty) {
+      cleanToken = token.trim();
+      if (cleanToken.startsWith('Bearer ')) {
+        cleanToken = cleanToken.substring(7).trim();
+      }
+    }
+
+    final jsonMap = <String, dynamic>{
+      'ssid': ssid.trim(),
+      'password': password.trim(),
+      if (cleanToken != null && cleanToken.isNotEmpty) 'token': cleanToken,
+      if (clientId != null && clientId.isNotEmpty) 'client_id': clientId.trim(),
     };
     final payload = Uint8List.fromList(
       utf8.encode(jsonEncode(jsonMap)),
@@ -206,11 +216,12 @@ class BleService {
   static Future<void> sendToken(
     ScannedDevice device, {
     required String token,
+    String? clientId,
   }) async {
     final char = await _findCvaiChar(device, CvaiBle.wifiCredsCharUuid);
     final formats = [
-      {'token': token},
-      {'access_token': token},
+      {'token': token, if (clientId != null) 'client_id': clientId},
+      {'access_token': token, if (clientId != null) 'client_id': clientId},
       {'accessToken': token},
     ];
 
@@ -251,8 +262,9 @@ class BleService {
       );
     }
     final services = await native.discoverServices();
+    final targetServices = CvaiBle.serviceUuids.map((u) => u.toLowerCase()).toSet();
     final svc = services.where(
-      (s) => s.uuid.toLowerCase() == CvaiBle.serviceUuid.toLowerCase(),
+      (s) => targetServices.contains(s.uuid.toLowerCase()),
     );
     if (svc.isEmpty) {
       throw BleException(
@@ -261,9 +273,42 @@ class BleService {
       );
     }
     final chars = await svc.first.getCharacteristics();
+    final candidates = <String>{charUuid.toLowerCase()};
+    if (charUuid.toLowerCase() == CvaiBle.wifiListCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyWifiListCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.wifiListCharUuid.toLowerCase(),
+        CvaiBle.legacyWifiListCharUuid.toLowerCase(),
+      ]);
+    } else if (charUuid.toLowerCase() == CvaiBle.wifiCredsCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyWifiCredsCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.wifiCredsCharUuid.toLowerCase(),
+        CvaiBle.legacyWifiCredsCharUuid.toLowerCase(),
+      ]);
+    } else if (charUuid.toLowerCase() == CvaiBle.statusCharUuid.toLowerCase() ||
+        charUuid.toLowerCase() == CvaiBle.legacyStatusCharUuid.toLowerCase()) {
+      candidates.addAll([
+        CvaiBle.statusCharUuid.toLowerCase(),
+        CvaiBle.legacyStatusCharUuid.toLowerCase(),
+      ]);
+    }
+
     final match = chars.where(
-      (c) => c.uuid.toLowerCase() == charUuid.toLowerCase(),
+      (c) => candidates.contains(c.uuid.toLowerCase()),
     );
+    if (match.isNotEmpty) {
+      return match.first;
+    }
+    if (candidates.contains(CvaiBle.wifiListCharUuid.toLowerCase()) && chars.isNotEmpty) {
+      return chars[0];
+    }
+    if (candidates.contains(CvaiBle.wifiCredsCharUuid.toLowerCase()) && chars.length > 1) {
+      return chars[1];
+    }
+    if (candidates.contains(CvaiBle.statusCharUuid.toLowerCase()) && chars.length > 2) {
+      return chars[2];
+    }
     if (match.isEmpty) {
       throw BleException(
         'Device is missing a required characteristic ($charUuid).',
@@ -294,6 +339,11 @@ class BleService {
       if (item is Map) {
         final net = WifiNetwork.fromJson(item.cast<String, dynamic>());
         if (net.ssid.isNotEmpty) list.add(net);
+      } else if (item is String && item.trim().isNotEmpty) {
+        list.add(WifiNetwork(
+          ssid: item.trim(),
+          secured: true,
+        ));
       }
     }
     return list;

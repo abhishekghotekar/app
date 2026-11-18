@@ -7,6 +7,7 @@ import '../../theme/app_text_styles.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/user_avatar.dart';
 import '../auth/login_screen.dart';
+import '../../services/auth_storage.dart';
 import '../rules/rules_list_screen.dart';
 import '../rules/detection_settings_screen.dart';
 import 'account_settings_screen.dart';
@@ -78,10 +79,14 @@ class SettingsScreen extends StatelessWidget {
           padding: EdgeInsets.zero,
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-              (route) => false,
-            ),
+            onTap: () async {
+              await AuthStorage.clear();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
             child: Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 14),

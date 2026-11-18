@@ -14,6 +14,7 @@ import '../../theme/app_text_styles.dart';
 import '../../widgets/app_app_bar.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/primary_button.dart';
+import '../dashboard/home_screen.dart';
 import 'ble_pair_screen.dart';
 
 class BleScanScreen extends StatefulWidget {
@@ -31,6 +32,10 @@ class _BleScanScreenState extends State<BleScanScreen>
   /// (web) are restricted to CVAI-looking BLE peripherals so the user
   /// doesn't accidentally pair with random devices.
   bool _cvaiOnly = false;
+
+  /// When true, anonymous BLE beacons without names are hidden so the user
+  /// sees real devices (Raspberry Pi, named peripherals) instead of clutter.
+  bool _hideUnnamed = true;
 
   // --- web: devices picked from the browser chooser ----------------------
   final List<ScannedDevice> _webDevices = [];
@@ -109,17 +114,26 @@ class _BleScanScreenState extends State<BleScanScreen>
     });
     _resultsSub = BleService.scanResults().listen((list) {
       if (!mounted) return;
-      // Show *every* discoverable device — BLE + Classic, named or not,
-      // paired or fresh. Order: bonded first, then strongest signal first,
-      // then named before unnamed as a final tiebreaker.
-      final sorted = [...list]..sort((a, b) {
+      final cvaiUuid = CvaiBle.serviceUuid.toLowerCase();
+      // Keep BLE peripherals and any paired/bonded devices from the phone
+      final visibleList = list.where((d) => d.kind == BluetoothKind.ble || d.isBonded).toList();
+      final sorted = [...visibleList]..sort((a, b) {
+        // Priority 1: CVAI / Raspberry Pi devices always at the very top
+        final aCvai = _looksLikeCvai(a, cvaiUuid: cvaiUuid);
+        final bCvai = _looksLikeCvai(b, cvaiUuid: cvaiUuid);
+        if (aCvai != bCvai) return aCvai ? -1 : 1;
+
+        // Priority 2: Paired / bonded devices in phone settings
         if (a.isBonded != b.isBonded) return a.isBonded ? -1 : 1;
-        final rssiCmp = (b.rssi ?? -999).compareTo(a.rssi ?? -999);
-        if (rssiCmp != 0) return rssiCmp;
-        final aNamed = a.name.isNotEmpty;
-        final bNamed = b.name.isNotEmpty;
+
+        // Priority 3: Named devices before unnamed devices
+        final aNamed = a.name.trim().isNotEmpty;
+        final bNamed = b.name.trim().isNotEmpty;
         if (aNamed != bNamed) return aNamed ? -1 : 1;
-        return 0;
+
+        // Priority 4: Stronger signal (RSSI) first
+        final rssiCmp = (b.rssi ?? -999).compareTo(a.rssi ?? -999);
+        return rssiCmp;
       });
       setState(() => _results = sorted);
     });
@@ -216,7 +230,20 @@ class _BleScanScreenState extends State<BleScanScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: 'Pair Device', showBack: true),
+      appBar: AppAppBar(
+        title: 'Pair Device',
+        showBack: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            ),
+            child: const Text('Skip', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -268,13 +295,17 @@ class _BleScanScreenState extends State<BleScanScreen>
 
     // Filter rules:
     //  - With "Only CVAI" ON: keep peripherals that advertise our
-    //    service UUID or whose name starts with CVAI-.
-    //  - With "Only CVAI" OFF: show everything we found so Raspberry Pi
-    //    devices in either BLE or Classic mode are visible.
+    //    service UUID or whose name starts with CVAI- or contains raspberry/pi.
+    //  - With "Hide Unnamed" ON: hide anonymous beacons that have no name.
     final cvaiUuid = CvaiBle.serviceUuid.toLowerCase();
     final visible = _results
         .where((d) {
           if (_cvaiOnly) return _looksLikeCvai(d, cvaiUuid: cvaiUuid);
+          if (_hideUnnamed) {
+            final isNamed = d.name.trim().isNotEmpty;
+            final isCvai = _looksLikeCvai(d, cvaiUuid: cvaiUuid);
+            if (!isNamed && !isCvai) return false;
+          }
           return true;
         })
         .toList(growable: false);
@@ -295,13 +326,26 @@ class _BleScanScreenState extends State<BleScanScreen>
               ),
               const SizedBox(width: 8),
               Text('Scanning for devices…', style: AppTextStyles.caption),
-            ] else
+            ] else ...[
               Text(
                 '${visible.length} device${visible.length == 1 ? '' : 's'} '
-                'found${_cvaiOnly ? ' (CVAI only)' : ''}'
-                '${hiddenCount > 0 ? ' · $hiddenCount hidden by filter' : ''}',
+                'found${_cvaiOnly ? ' (CVAI only)' : ''}',
                 style: AppTextStyles.caption,
               ),
+              if (hiddenCount > 0) ...[
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => setState(() => _hideUnnamed = !_hideUnnamed),
+                  child: Text(
+                    '($hiddenCount unnamed hidden)',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
         const SizedBox(height: 16),
@@ -312,8 +356,11 @@ class _BleScanScreenState extends State<BleScanScreen>
               _cvaiOnly
                   ? 'No CVAI devices nearby. The device must be powered on '
                       'and in setup mode.'
-                  : 'No Bluetooth devices nearby. Make sure your CVAI device '
-                      'is powered on and discoverable, then scan again.',
+                  : (_hideUnnamed && hiddenCount > 0)
+                      ? 'No named devices found yet ($hiddenCount unnamed beacons detected). '
+                          'Tap above to show unnamed devices or scan again.'
+                      : 'No Bluetooth devices nearby. Make sure your CVAI device '
+                          'is powered on and discoverable, then scan again.',
               textAlign: TextAlign.center,
               style: AppTextStyles.caption,
             ),
@@ -333,38 +380,66 @@ class _BleScanScreenState extends State<BleScanScreen>
 
   Widget _filterToggle() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surfaceAlt,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Icon(LucideIcons.filter, size: 18, color: AppColors.info),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Only CVAI devices', style: AppTextStyles.bodyStrong),
-                Text(
-                  'Filter to devices advertising the CVAI service or "CVAI-" name.',
-                  style: AppTextStyles.caption,
+          Row(
+            children: [
+              const Icon(LucideIcons.eyeOff, size: 18, color: AppColors.info),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Hide unnamed devices', style: AppTextStyles.bodyStrong),
+                    Text(
+                      'Hides empty beacons so Raspberry Pi and named devices stand out.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Switch.adaptive(
+                value: _hideUnnamed,
+                onChanged: (v) {
+                  setState(() => _hideUnnamed = v);
+                },
+              ),
+            ],
           ),
-          Switch.adaptive(
-            value: _cvaiOnly,
-            onChanged: (v) {
-              setState(() => _cvaiOnly = v);
-              // Restart the OS-level scan with the new filter immediately
-              // so the result list reflects the toggle right away.
-              BleService.stopScan();
-              setState(() => _results = const []);
-              _startScan();
-            },
+          const Divider(height: 12),
+          Row(
+            children: [
+              const Icon(LucideIcons.filter, size: 18, color: AppColors.info),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Only CVAI devices', style: AppTextStyles.bodyStrong),
+                    Text(
+                      'Filter strictly to CVAI service or "CVAI-" peripherals.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _cvaiOnly,
+                onChanged: (v) {
+                  setState(() => _cvaiOnly = v);
+                  // Restart the OS-level scan with the new filter immediately
+                  BleService.stopScan();
+                  setState(() => _results = const []);
+                  _startScan();
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -443,7 +518,10 @@ class _BleScanScreenState extends State<BleScanScreen>
 
   bool _looksLikeCvai(ScannedDevice device, {required String cvaiUuid}) {
     if (device.serviceUuids.contains(cvaiUuid)) return true;
-    return device.name.toUpperCase().startsWith(cvaiBleNamePrefix);
+    final upper = device.name.toUpperCase();
+    return upper.startsWith(cvaiBleNamePrefix) ||
+        upper.contains('RASPBERRY') ||
+        upper.contains('PI');
   }
 
   Widget _webBody() {
@@ -477,17 +555,22 @@ class _BleScanScreenState extends State<BleScanScreen>
   }
 
   Widget _deviceCard(ScannedDevice device) {
-    final isCvai =
-        device.serviceUuids.contains(CvaiBle.serviceUuid.toLowerCase());
-    final displayName = device.name.isNotEmpty
-        ? device.name
+    final cvaiUuid = CvaiBle.serviceUuid.toLowerCase();
+    final isCvai = _looksLikeCvai(device, cvaiUuid: cvaiUuid);
+    final isPi = device.name.toLowerCase().contains('raspberry') ||
+        device.name.toLowerCase().contains('pi');
+    final hasName = device.name.trim().isNotEmpty;
+    final displayName = hasName
+        ? device.name.trim()
         : isCvai
-            ? 'CVAI device'
-            : 'Unnamed device';
+            ? 'Raspberry Pi (CVAI)'
+            : 'BLE Device (${device.id.length > 5 ? device.id.substring(device.id.length - 5) : device.id})';
     final subtitleParts = <String>[];
     if (device.rssi != null) subtitleParts.add('Signal ${device.rssi} dBm');
     subtitleParts.add(device.id);
     final subtitle = subtitleParts.join(' · ');
+
+    final highlight = isCvai || isPi;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -499,11 +582,14 @@ class _BleScanScreenState extends State<BleScanScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.infoBg,
+                color: highlight ? AppColors.successBg : AppColors.infoBg,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(LucideIcons.cpu,
-                  size: 20, color: AppColors.info),
+              child: Icon(
+                highlight ? LucideIcons.cpu : LucideIcons.bluetooth,
+                size: 20,
+                color: highlight ? AppColors.success : AppColors.info,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -515,12 +601,33 @@ class _BleScanScreenState extends State<BleScanScreen>
                       Flexible(
                         child: Text(
                           displayName,
-                          style: AppTextStyles.bodyStrong,
+                          style: AppTextStyles.bodyStrong.copyWith(
+                            color: highlight ? AppColors.primary : null,
+                            fontWeight: highlight ? FontWeight.bold : FontWeight.w600,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),
+                      if (highlight) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.successBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Pi / CVAI',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       _kindBadge(device.kind),
                       if (device.isBonded) ...[
                         const SizedBox(width: 4),

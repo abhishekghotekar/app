@@ -92,6 +92,7 @@ class LucideIcons {
   // messaging
   static const IconData messageCircle   = Icons.chat_bubble_outline;
   static const IconData message         = Icons.chat_outlined;
+  static const IconData send            = Icons.send;
 
   // volume / audio playback
   static const IconData volume2         = Icons.volume_up_outlined;

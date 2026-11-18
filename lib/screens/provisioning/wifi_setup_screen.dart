@@ -9,6 +9,7 @@ import '../../models/wifi_network.dart';
 import '../../services/ble_service.dart';
 import '../../services/auth_storage.dart';
 import '../../services/device_storage.dart';
+import '../../services/attendance_api.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/app_app_bar.dart';
@@ -16,6 +17,7 @@ import '../../widgets/app_text_field.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/secondary_button.dart';
 import 'provisioning_success_screen.dart';
+import '../dashboard/home_screen.dart';
 
 /// Drives the WiFi half of provisioning against the paired CVAI device:
 ///
@@ -102,20 +104,31 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
       list = unique.values.toList()
         ..sort((a, b) => (b.rssi ?? -999).compareTo(a.rssi ?? -999));
 
+      // Fallback 1: Try reading WiFi networks seen by Raspberry Pi via BLE
+      if (list.isEmpty) {
+        try {
+          list = await BleService.listWifiNetworks(widget.device);
+        } catch (_) {}
+      }
+
       if (!mounted) return;
       setState(() {
         _networks = list;
         _selected = list.isNotEmpty ? list.first : null;
-        _phase = list.isEmpty ? _Phase.failed : _Phase.ready;
-        _error = list.isEmpty
-            ? 'No WiFi networks found by your phone. Turn on your WiFi and Location, then try again.'
-            : null;
+        if (list.isEmpty) {
+          // Fallback 2: Do NOT fail; allow user to type SSID manually
+          _manualSsid = true;
+        }
+        _phase = _Phase.ready;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _phase = _Phase.failed;
-        _error = 'Failed to scan WiFi on phone: $e';
+        // In case of error, switch to manual entry rather than getting stuck
+        _manualSsid = true;
+        _phase = _Phase.ready;
+        _error = null;
       });
     }
   }
@@ -151,10 +164,25 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
       _tokenSent = false;
     });
     try {
+      // Fetch active login Bearer token from AuthStorage / AttendanceApi
+      String token = AttendanceApi.fallbackToken;
+      try {
+        final sessionToken = await AuthStorage.accessToken();
+        if (sessionToken != null &&
+            sessionToken.isNotEmpty &&
+            sessionToken != 'mock_access_token_from_skip_login') {
+          token = sessionToken;
+        }
+      } catch (e) {
+        debugPrint('[WiFiSetup] Error loading token from storage: $e');
+      }
+
       await BleService.sendWifiCredentials(
         widget.device,
-        ssid: ssid,
-        password: _password.text,
+        ssid: ssid.trim(),
+        password: _password.text.trim(),
+        token: token,
+        clientId: AttendanceApi.clientId,
       );
       // Now we wait for the status notification to flip to connecting →
       // connected/failed; _handleStatus drives the rest.
@@ -166,6 +194,50 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
         _phase = _Phase.failed;
         _error = e.message;
       });
+    }
+  }
+
+  Future<void> _sendTokenToDevice() async {
+    if (_tokenSent) {
+      debugPrint('[WiFiSetup] Token already sent, skipping duplicate call.');
+      return;
+    }
+    _tokenSent = true;
+    if (mounted) setState(() => _phase = _Phase.sendingToken);
+    try {
+      var token = await AuthStorage.accessToken();
+      if (token == null || token.isEmpty || token == 'mock_access_token_from_skip_login') {
+        token = AttendanceApi.fallbackToken;
+      }
+      debugPrint('[WiFiSetup] Sending token to Pi (token length: ${token.length}, clientId: ${AttendanceApi.clientId})');
+      await BleService.sendToken(
+        widget.device,
+        token: token,
+        clientId: AttendanceApi.clientId,
+      );
+      if (mounted) {
+        await _onConnected(ProvisionStatus(
+          state: ProvisionState.connected,
+          ip: 'Local Network',
+          token: token,
+        ));
+      }
+    } on BleException catch (e) {
+      _tokenSent = false;
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.failed;
+          _error = 'Failed to send token: ${e.message}';
+        });
+      }
+    } catch (e) {
+      _tokenSent = false;
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.failed;
+          _error = 'Error sending token: $e';
+        });
+      }
     }
   }
 
@@ -181,8 +253,13 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
         break;
 
       case ProvisionState.wifi_ok:
-        // Pi connected to WiFi — ask user to switch to the same network.
+        // Pi connected to WiFi — ask user to switch to the same network and auto-send token
         setState(() => _phase = _Phase.wifiOk);
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (mounted && !_tokenSent) {
+            _sendTokenToDevice();
+          }
+        });
         break;
 
       case ProvisionState.wifi_fail:
@@ -202,66 +279,27 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
         break;
 
       case ProvisionState.request_token:
-        if (_tokenSent) {
-          debugPrint('[WiFiSetup] Token already sent, ignoring redundant REQUEST_TOKEN.');
-          break;
-        }
-        _tokenSent = true;
-        setState(() => _phase = _Phase.sendingToken);
-        try {
-          final token = await AuthStorage.accessToken();
-          if (token == null || token.isEmpty) {
-            if (mounted) {
-              setState(() {
-                _phase = _Phase.failed;
-                _error = 'No access token available to send. Please log in again.';
-              });
-            }
-            break;
-          }
-          await BleService.sendToken(widget.device, token: token);
-          if (mounted) {
-            // Navigate to success — IP is not available over this path,
-            // so we use a placeholder that the success screen handles gracefully.
-            await _onConnected(ProvisionStatus(
-              state: ProvisionState.connected,
-              ip: 'Local Network',
-              token: token,
-            ));
-          }
-        } on BleException catch (e) {
-          if (mounted) {
-            setState(() {
-              _phase = _Phase.failed;
-              _error = 'Failed to send token: ${e.message}';
-            });
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              _phase = _Phase.failed;
-              _error = 'Error sending token: $e';
-            });
-          }
-        }
+        await _sendTokenToDevice();
         break;
     }
   }
 
   Future<void> _onConnected(ProvisionStatus status) async {
     final ip = status.ip ?? '';
-    final token = status.token ?? '';
-    // Token is always required; IP is optional (token-only path sends 'Local Network').
+    String token = status.token ?? '';
+    // If Pi did not echo token back, use our authenticated active login session token
     if (token.isEmpty) {
-      setState(() {
-        _phase = _Phase.failed;
-        _error = 'Provisioning completed but no auth token was received.';
-      });
-      return;
+      final sessionToken = await AuthStorage.accessToken();
+      token = (sessionToken != null &&
+              sessionToken.isNotEmpty &&
+              sessionToken != 'mock_access_token_from_skip_login')
+          ? sessionToken
+          : AttendanceApi.fallbackToken;
     }
+
     await DeviceStorage.save(
       bleId: widget.device.id,
-      name: widget.device.name.isNotEmpty ? widget.device.name : 'CVAI device',
+      name: widget.device.name.isNotEmpty ? widget.device.name : 'Raspberry Pi',
       ip: ip.isEmpty ? 'Local Network' : ip,
       token: token,
     );
@@ -272,7 +310,7 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
         builder: (_) => ProvisioningSuccessScreen(
           deviceName: widget.device.name.isNotEmpty
               ? widget.device.name
-              : 'CVAI device',
+              : 'Raspberry Pi',
           ip: ip.isEmpty ? 'Local Network' : ip,
           ssid: _sentSsid ?? _selected?.ssid ?? '',
         ),
@@ -285,7 +323,20 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppAppBar(title: 'Connect to WiFi', showBack: true),
+      appBar: AppAppBar(
+        title: 'Connect to WiFi',
+        showBack: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+              (route) => false,
+            ),
+            child: const Text('Skip', style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -662,6 +713,12 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
           ),
         ),
         const SizedBox(height: 20),
+        PrimaryButton(
+          label: 'Send Token to Raspberry Pi',
+          icon: LucideIcons.send,
+          onPressed: _tokenSent ? null : _sendTokenToDevice,
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
             const SizedBox(
@@ -672,7 +729,9 @@ class _WifiSetupScreenState extends State<WifiSetupScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Waiting for the device to request your token…',
+                _tokenSent
+                    ? 'Sending authentication token to Raspberry Pi…'
+                    : 'Auto-sending token, or tap button above to send now.',
                 style: AppTextStyles.caption,
               ),
             ),

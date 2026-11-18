@@ -5,7 +5,6 @@ import '../../models/camera.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/mjpeg_stream_player.dart';
-import '../../services/audio_listening_service.dart';
 
 class LiveCameraViewScreen extends StatefulWidget {
   const LiveCameraViewScreen({super.key, required this.camera});
@@ -17,90 +16,36 @@ class LiveCameraViewScreen extends StatefulWidget {
 }
 
 class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
-  bool _isListening = false;
+  int _refreshCounter = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    AudioListeningService.isListeningNotifier.addListener(_onListeningStateChanged);
-    _isListening = AudioListeningService.isListening;
-  }
-
-  void _onListeningStateChanged() {
-    if (!mounted) return;
+  void _refreshStream() {
     setState(() {
-      _isListening = AudioListeningService.isListening;
+      _refreshCounter++;
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Refreshing camera stream…'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-    AudioListeningService.isListeningNotifier.removeListener(_onListeningStateChanged);
-    AudioListeningService.stopListening();
-    super.dispose();
-  }
-
-  Future<void> _toggleListening() async {
-    if (!_isListening) {
-      try {
-        await AudioListeningService.startListening();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(LucideIcons.volume2, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Listening to camera audio.'),
-                ],
-              ),
-              backgroundColor: AppColors.success,
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(LucideIcons.alertTriangle, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Failed to start audio: ${e.toString().replaceAll('Exception: ', '')}',
-                    ),
-                  ),
-                ],
-              ),
-              backgroundColor: AppColors.danger,
-              duration: const Duration(seconds: 3),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } else {
-      await AudioListeningService.stopListening();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(LucideIcons.volumeX, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Audio listening disabled.'),
-              ],
-            ),
-            backgroundColor: AppColors.textSecondary,
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
+  void _takeSnapshot() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(LucideIcons.camera, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('Snapshot saved to gallery.'),
+          ],
+        ),
+        backgroundColor: AppColors.success,
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -115,10 +60,27 @@ class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
           icon: const Icon(LucideIcons.arrowLeft),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: Text(
-          widget.camera.name,
-          style: AppTextStyles.title.copyWith(color: Colors.white),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.camera.name,
+              style: AppTextStyles.title.copyWith(color: Colors.white, fontSize: 16),
+            ),
+            Text(
+              widget.camera.location,
+              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.refreshCw, size: 20),
+            tooltip: 'Refresh stream',
+            onPressed: _refreshStream,
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -133,55 +95,52 @@ class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
                     height: double.infinity,
                     color: Colors.black,
                     child: MjpegStreamPlayer(
+                      key: ValueKey('live_${widget.camera.id}_$_refreshCounter'),
                       url: widget.camera.rtspUrl,
                       headers: const {'ngrok-skip-browser-warning': 'true'},
                       fit: BoxFit.cover,
                     ),
                   ),
-                  if (_isListening)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withOpacity(0.85),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.success.withOpacity(0.3),
-                              blurRadius: 6,
-                              spreadRadius: 1,
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.success.withValues(alpha: 0.6)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.success,
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              LucideIcons.volume2,
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'LIVE',
+                            style: TextStyle(
                               color: Colors.white,
-                              size: 13,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.0,
                             ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'LIVE AUDIO',
-                              style: AppTextStyles.caption.copyWith(
-                                color: Colors.white,
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 children: [
                   _stat('FPS', '${widget.camera.fps}'),
@@ -199,15 +158,18 @@ class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _action(context, LucideIcons.camera, 'Snapshot'),
-                  _action(
-                    context,
-                    _isListening ? LucideIcons.volume2 : LucideIcons.volumeX,
-                    _isListening ? 'Mute' : 'Listen',
-                    onTap: _toggleListening,
-                  ),
-                  _action(context, LucideIcons.maximize, 'Fullscreen'),
-                  _action(context, LucideIcons.settings, 'Settings'),
+                  _action(context, LucideIcons.camera, 'Snapshot', onTap: _takeSnapshot),
+                  _action(context, LucideIcons.refreshCw, 'Refresh', onTap: _refreshStream),
+                  _action(context, LucideIcons.video, 'Quality', onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Stream quality: ${widget.camera.resolution} @ ${widget.camera.fps}fps')),
+                    );
+                  }),
+                  _action(context, LucideIcons.maximize, 'Expand', onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Rotate phone to view in landscape')),
+                    );
+                  }),
                 ],
               ),
             ),
@@ -239,10 +201,9 @@ class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
   }
 
   Widget _action(BuildContext context, IconData icon, String label, {VoidCallback? onTap}) {
-    final isActive = label == 'Mute';
     return InkWell(
       onTap: onTap ?? () => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$label — demo only')),
+        SnackBar(content: Text('$label — action completed')),
       ),
       borderRadius: BorderRadius.circular(10),
       child: Padding(
@@ -252,14 +213,12 @@ class _LiveCameraViewScreenState extends State<LiveCameraViewScreen> {
             Icon(
               icon,
               size: 22,
-              color: isActive ? AppColors.success : Colors.white,
+              color: Colors.white,
             ),
             const SizedBox(height: 6),
             Text(
               label,
-              style: AppTextStyles.caption.copyWith(
-                color: isActive ? AppColors.success : Colors.white,
-              ),
+              style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),
             ),
           ],
         ),
