@@ -91,7 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const BleScanScreen()),
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
   }
 
@@ -207,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 16),
                         SecondaryButton(
-                          label: 'Skip to App (Dev)',
+                          label: 'Continue to Dashboard',
                           icon: LucideIcons.arrowRight,
                           onPressed: _skipToApp,
                         ),

@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_icons.dart';
 
-import '../../data/mock_data.dart';
-import '../../models/camera.dart';
+import '../../services/api_config.dart';
+import '../../services/device_storage.dart';
 import '../../theme/app_colors.dart';
-import '../../theme/app_text_styles.dart';
-import '../../widgets/empty_state.dart';
 import '../../widgets/mjpeg_stream_player.dart';
-import '../dashboard/live_camera_view_screen.dart';
-import 'add_camera_screen.dart';
-import 'camera_settings_screen.dart';
 
+/// Clean, dedicated live view for the Face Attendance Raspberry Pi camera feed.
 class CameraListScreen extends StatefulWidget {
   const CameraListScreen({super.key});
 
@@ -19,15 +15,24 @@ class CameraListScreen extends StatefulWidget {
 }
 
 class _CameraListScreenState extends State<CameraListScreen> {
-  List<CameraModel> get _cameras => MockData.cameras;
-  int _selectedCameraIndex = 0;
   int _streamRefreshKey = 0;
+  String _deviceName = 'Raspberry Pi Camera';
 
-  void _addCamera() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AddCameraScreen()),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadDeviceName();
   }
+
+  Future<void> _loadDeviceName() async {
+    final dev = await DeviceStorage.read();
+    if (dev != null && dev.name.isNotEmpty && mounted) {
+      setState(() => _deviceName = '${dev.name} Camera');
+    }
+  }
+
+  String get _streamUrl =>
+      '${ApiConfig.cleanFaceAttendanceBaseUrl}/face/video-feed?resolution=768&height=768';
 
   void _refreshStream() {
     setState(() {
@@ -35,25 +40,8 @@ class _CameraListScreenState extends State<CameraListScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Refreshing camera stream…'),
+        content: Text('Refreshing live camera feed…'),
         duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  void _takeSnapshot() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(LucideIcons.camera, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('Snapshot captured successfully.'),
-          ],
-        ),
-        backgroundColor: AppColors.success,
-        duration: Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -61,212 +49,102 @@ class _CameraListScreenState extends State<CameraListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cameras.isEmpty) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: EmptyState(
-          icon: LucideIcons.video,
-          title: 'No cameras yet',
-          subtitle: 'Add a camera to monitor your space in real-time.',
-          actionLabel: 'Add Camera',
-          onAction: _addCamera,
-        ),
-      );
-    }
-
-    final selectedCam = _cameras[_selectedCameraIndex.clamp(0, _cameras.length - 1)];
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: Column(
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Top Camera Switcher if multiple cameras
-            if (_cameras.length > 1)
-              Container(
-                height: 48,
-                color: const Color(0xFF161616),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  itemCount: _cameras.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, idx) {
-                    final isSelected = idx == _selectedCameraIndex;
-                    final cam = _cameras[idx];
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCameraIndex = idx),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : const Color(0xFF262626),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          cam.name,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+            // Full Live Camera Video Stream
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: MjpegStreamPlayer(
+                    key: ValueKey('face_cam_$_streamRefreshKey'),
+                    url: _streamUrl,
+                    headers: const {'ngrok-skip-browser-warning': 'true'},
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
+            ),
 
-            // Main Camera Video Player
-            Expanded(
-              child: Stack(
-                alignment: Alignment.center,
+            // Top Overlay: Live Badge + Camera Name + Refresh Button
+            Positioned(
+              top: 14,
+              left: 14,
+              right: 14,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Live Badge & Name
                   Container(
-                    width: double.infinity,
-                    height: double.infinity,
-                    color: Colors.black,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => LiveCameraViewScreen(camera: selectedCam),
-                            ),
-                          );
-                        },
-                        child: MjpegStreamPlayer(
-                          key: ValueKey('${selectedCam.id}_$_streamRefreshKey'),
-                          url: selectedCam.rtspUrl,
-                          headers: const {'ngrok-skip-browser-warning': 'true'},
-                          fit: BoxFit.contain,
-                        ),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
                       ),
                     ),
-                  ),
-
-                  // Top Stream Header Overlay
-                  Positioned(
-                    top: 14,
-                    left: 14,
-                    right: 14,
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Live badge & Camera Name
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.success,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Text(
-                                'LIVE',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 1,
-                                height: 10,
-                                color: Colors.white.withValues(alpha: 0.3),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                selectedCam.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: AppColors.success,
+                            shape: BoxShape.circle,
                           ),
                         ),
-
-                        // Action icons on top right
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _refreshStream,
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                                ),
-                                child: const Icon(LucideIcons.refreshCw, color: Colors.white, size: 16),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => LiveCameraViewScreen(camera: selectedCam),
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                width: 34,
-                                height: 34,
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.65),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                                ),
-                                child: const Icon(LucideIcons.maximize, color: Colors.white, size: 16),
-                              ),
-                            ),
-                          ],
+                        const SizedBox(width: 8),
+                        const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 1,
+                          height: 10,
+                          color: Colors.white30,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _deviceName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // Bottom Location Badge Overlay
-                  Positioned(
-                    bottom: 14,
-                    left: 14,
+                  // Refresh Button
+                  GestureDetector(
+                    onTap: _refreshStream,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.black.withValues(alpha: 0.72),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.camera, color: Colors.white70, size: 13),
-                          const SizedBox(width: 6),
-                          Text(
-                            selectedCam.location,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
+                      child: const Icon(
+                        LucideIcons.refreshCw,
+                        color: Colors.white,
+                        size: 16,
                       ),
                     ),
                   ),
@@ -274,75 +152,58 @@ class _CameraListScreenState extends State<CameraListScreen> {
               ),
             ),
 
-            // Bottom Control and Action Panel
-            Container(
-              color: const Color(0xFF141414),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            // Bottom Overlay: Location & Feed Info
+            Positioned(
+              bottom: 16,
+              left: 14,
+              right: 14,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _bottomAction(
-                    icon: LucideIcons.camera,
-                    label: 'Snapshot',
-                    onTap: _takeSnapshot,
-                  ),
-                  _bottomAction(
-                    icon: LucideIcons.maximize,
-                    label: 'Fullscreen',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => LiveCameraViewScreen(camera: selectedCam),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.mapPin, color: Colors.white70, size: 12),
+                        SizedBox(width: 6),
+                        Text(
+                          'Face Attendance Point',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
-                  _bottomAction(
-                    icon: LucideIcons.settings,
-                    label: 'Settings',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CameraSettingsScreen(camera: selectedCam),
-                        ),
-                      );
-                    },
-                  ),
-                  _bottomAction(
-                    icon: LucideIcons.plus,
-                    label: 'Add Camera',
-                    onTap: _addCamera,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.65),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: const Text(
+                      '768p • 30 FPS',
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _bottomAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: Colors.white, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFFBBBBBB),
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
               ),
             ),
           ],

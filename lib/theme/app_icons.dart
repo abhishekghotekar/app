@@ -72,6 +72,7 @@ class LucideIcons {
   static const IconData calendarRange   = Icons.date_range;
 
   // misc
+  static const IconData mapPin          = Icons.location_on_outlined;
   static const IconData settings        = Icons.settings_outlined;
   static const IconData phone           = Icons.phone_outlined;
   static const IconData layoutDashboard = Icons.dashboard_outlined;

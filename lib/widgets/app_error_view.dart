@@ -24,18 +24,6 @@ class AppErrorView extends StatefulWidget {
 
   /// Displays a highly styled contextual pop-up alert dialog for the error.
   static void show(BuildContext context, String error, {VoidCallback? onRetry}) {
-    final err = error.toLowerCase();
-    
-    // 1. Session Expiration / Unauthorized (Immediate logout/redirect)
-    if (err.contains('401') || err.contains('403') || err.contains('unauthorized') || err.contains('invalid token')) {
-      AuthStorage.clear();
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
-      return;
-    } 
-
     final details = AppErrorDetails.fromError(error, customTitle: null, customIcon: null);
 
     showDialog<void>(
@@ -141,19 +129,7 @@ class AppErrorView extends StatefulWidget {
 class _AppErrorViewState extends State<AppErrorView> {
   @override
   Widget build(BuildContext context) {
-    // Session expiration check
     final err = widget.error.toLowerCase();
-    if (err.contains('401') || err.contains('403') || err.contains('unauthorized') || err.contains('invalid token')) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        AuthStorage.clear();
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
-        );
-      });
-      return const SizedBox.shrink();
-    }
-
     final details = AppErrorDetails.fromError(
       widget.error,
       customTitle: widget.title,

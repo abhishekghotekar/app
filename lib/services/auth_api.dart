@@ -23,7 +23,8 @@ class AuthApi {
     required String email,
     required String password,
   }) async {
-    final uri = Uri.parse('${ApiConfig.platformBaseUrl}${ApiConfig.loginPath}');
+    final uri =
+        Uri.parse('${ApiConfig.cleanPlatformBaseUrl}${ApiConfig.loginPath}');
 
     late http.Response res;
     try {

@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/whatsapp_rule.dart';
+import 'api_config.dart';
 import 'auth_storage.dart';
 import 'attendance_api.dart';
 
 /// API service for the WhatsApp Rules backend.
 ///
-/// Base URL  : https://2092-59-97-150-29.ngrok-free.app
+/// Base URL  : Driven by [ApiConfig.cleanFaceAttendanceBaseUrl]
 /// Endpoints :
 ///   GET    /whatsapp/rules          → list all rules
 ///   POST   /whatsapp/rules          → create a rule
@@ -17,7 +18,7 @@ import 'attendance_api.dart';
 class WhatsAppRulesApi {
   WhatsAppRulesApi._();
 
-  static const String _baseUrl = 'https://2092-59-97-150-29.ngrok-free.app';
+  static String get _baseUrl => ApiConfig.cleanFaceAttendanceBaseUrl;
   static const String _rulesPath = '/whatsapp/rules';
 
   static const Map<String, String> _defaultHeaders = {

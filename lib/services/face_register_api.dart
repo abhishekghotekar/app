@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'api_config.dart';
 import 'auth_storage.dart';
 import 'attendance_api.dart';
 
@@ -35,8 +36,8 @@ class FaceRegisterApi {
     return token;
   }
 
-  /// Change this to your current ngrok URL.
-  static const String baseUrl = 'https://ad3a-59-97-150-29.ngrok-free.app/';
+  /// Base URL centrally driven by ApiConfig.cleanFaceAttendanceBaseUrl
+  static String get baseUrl => ApiConfig.cleanFaceAttendanceBaseUrl;
 
   /// The client (organisation) ID for all face API calls.
   static String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';

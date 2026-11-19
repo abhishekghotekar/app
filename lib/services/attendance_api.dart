@@ -1,17 +1,19 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/attendance_record.dart';
+import 'api_config.dart';
 import 'auth_storage.dart';
+import 'device_storage.dart';
 
 /// Calls the hierarchy-attendance cloud platform API.
 class AttendanceApi {
   AttendanceApi._();
 
-  static const String baseUrl = 'https://qa-new-platform.duckdns.org';
+  static String get baseUrl => ApiConfig.cleanPlatformBaseUrl;
 
   // Fallback token for testing/development if local session is empty
   static const String fallbackToken =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYTJhMjAzMzUtNmU1ZC00ODU5LTg0ODctM2Y0YzUzZGNmNjMzIiwidXNlcl90eXBlIjoiQWRtaW4iLCJjbGllbnRzIjp7IjVkODVjOTRkLWE4YTctNDQ5YS05MzljLTIxMjQwOTJjNzRhMCI6IjM0ZjA3MzYwLTMzMGYtNDU2Zi1hZDMxLWIwNDM3NTNkZWM5NyIsIjZjZjY1YjdkLTU0MDAtNGM4NC1hNTZkLWM3YmFkMmUzYjc5ZCI6IjRmNjRiNDFlLTI0OTItNGE0Ny1hZTQyLTI5YTA2ZGM3ZTU1NSIsImJhZDdjODM3LTZkNWQtNGRjMC1iNzA0LWVmOGI3NzM1MjQwYiI6IjFmNTczODJhLWVmMzgtNGUzNS05MTU3LTg0YmE1ZDhkMmU5MyIsImY0MGNmMjM5LTIyYTAtNDQ3NC05ZmVjLTVhNTNkOGYxNjg5YSI6ImRiZTZiOWU4LTMzMDAtNDAyNy04MGEwLTJkZWE1NzBhODMzNyIsImY2ZjhkMDUyLTg1YTAtNDdjYy1hYWE3LTY0ZWVkYzgyMTliMyI6IjFhMWFiMzQyLWRmM2EtNGQwNS04ZGYzLWEyNWFlMGUyYjg0YiJ9LCJ0b2tlbl92ZXJzaW9uIjowLCJpYXQiOjE3OTQ4OTM3NDIsImV4cCI6MTc5NTMyNTc0Mn0.d5IB0DlLRT2VdL9qNNwcIvfh9-DiSDK28G-cbH9cIjo';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiN2UyMWNjZGYtYmM0Zi00Njk3LTliNjktM2IxZDE4NjgwZjg5IiwidXNlcl90eXBlIjoiU3VwZXIgQWRtaW4iLCJjbGllbnRzIjp7fSwidG9rZW5fdmVyc2lvbiI6MTUsImlhdCI6MTc5NTAwNzA4MSwiZXhwIjoxNzk1NDM5MDgxfQ.EERZCeMfIuk5SmpM2odltqWOCMB_b6bEK2Sdz6L8JNQ';
 
   static String clientId = 'edb3ac03-5d77-45ac-a187-794ae63f1ef4';
 
@@ -51,11 +53,17 @@ class AttendanceApi {
     try {
       print('AttendanceApi: Loading token from storage...');
       final sessionToken = await AuthStorage.accessToken();
-      print(
-        'AttendanceApi: Session token exists: ${sessionToken != null && sessionToken.isNotEmpty}',
-      );
-      if (sessionToken != null && sessionToken.isNotEmpty) {
+      if (sessionToken != null &&
+          sessionToken.isNotEmpty &&
+          sessionToken != 'mock_access_token_from_skip_login') {
         token = sessionToken;
+      } else {
+        final dev = await DeviceStorage.read();
+        if (dev != null &&
+            dev.token.isNotEmpty &&
+            dev.token != 'mock_access_token_from_skip_login') {
+          token = dev.token;
+        }
       }
     } catch (e) {
       print('AttendanceApi: Error loading token from storage: $e');

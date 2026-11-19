@@ -62,7 +62,7 @@ class MockData {
   ];
 
   // --- Cameras -----------------------------------------------------------
-  static const List<CameraModel> cameras = [
+  static List<CameraModel> get cameras => [
     CameraModel(
       id: 'cam-rpi',
       name: 'Raspberry Pi Camera',
