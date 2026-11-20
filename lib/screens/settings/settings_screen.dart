@@ -9,7 +9,6 @@ import '../../widgets/user_avatar.dart';
 import '../auth/login_screen.dart';
 import '../../services/auth_storage.dart';
 import '../rules/rules_list_screen.dart';
-import '../rules/detection_settings_screen.dart';
 import 'account_settings_screen.dart';
 import 'device_settings_screen.dart';
 import 'notification_settings_screen.dart';
@@ -67,12 +66,10 @@ class SettingsScreen extends StatelessWidget {
                   _push(context, const NotificationSettingsScreen())),
         ]),
         const SizedBox(height: 24),
-        _label('RULES & ALERTS'),
+        _label('AUTOMATION'),
         _group(context, [
           _Row(LucideIcons.zap, 'Automation Rules',
               onTap: () => _push(context, const RulesListScreen())),
-          _Row(LucideIcons.shieldAlert, 'Face Detection Rules',
-              onTap: () => _push(context, const DetectionSettingsScreen())),
         ]),
         const SizedBox(height: 24),
         AppCard(

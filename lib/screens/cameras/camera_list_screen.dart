@@ -4,9 +4,10 @@ import '../../theme/app_icons.dart';
 import '../../services/api_config.dart';
 import '../../services/device_storage.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/mjpeg_stream_player.dart';
+import '../../widgets/webrtc_camera_view.dart';
 
-/// Clean, dedicated live view for the Face Attendance Raspberry Pi camera feed.
+/// Clean, dedicated live view for the Face Attendance Raspberry Pi camera feed
+/// powered by ultra-low-latency WebRTC (30 FPS, zero lag).
 class CameraListScreen extends StatefulWidget {
   const CameraListScreen({super.key});
 
@@ -31,16 +32,13 @@ class _CameraListScreenState extends State<CameraListScreen> {
     }
   }
 
-  String get _streamUrl =>
-      '${ApiConfig.cleanFaceAttendanceBaseUrl}/face/video-feed?resolution=768&height=768';
-
   void _refreshStream() {
     setState(() {
       _streamRefreshKey++;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Refreshing live camera feed…'),
+        content: Text('Reconnecting WebRTC camera feed…'),
         duration: Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
@@ -55,14 +53,14 @@ class _CameraListScreenState extends State<CameraListScreen> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Full Live Camera Video Stream
+            // ── Full Live Camera Video Stream (Dedicated WebRTC) ───────────
             Positioned.fill(
               child: Container(
                 color: Colors.black,
                 child: Center(
-                  child: MjpegStreamPlayer(
-                    key: ValueKey('face_cam_$_streamRefreshKey'),
-                    url: _streamUrl,
+                  child: WebRtcCameraView(
+                    key: ValueKey('webrtc_cam_$_streamRefreshKey'),
+                    offerUrl: ApiConfig.cameraWebRtcOfferUrl,
                     headers: const {'ngrok-skip-browser-warning': 'true'},
                     fit: BoxFit.contain,
                   ),
@@ -70,7 +68,7 @@ class _CameraListScreenState extends State<CameraListScreen> {
               ),
             ),
 
-            // Top Overlay: Live Badge + Camera Name + Refresh Button
+            // ── Top Overlay: Live Badge + Camera Name + Refresh Button ───────
             Positioned(
               top: 14,
               left: 14,
@@ -80,7 +78,10 @@ class _CameraListScreenState extends State<CameraListScreen> {
                 children: [
                   // Live Badge & Name
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(20),
@@ -152,7 +153,7 @@ class _CameraListScreenState extends State<CameraListScreen> {
               ),
             ),
 
-            // Bottom Overlay: Location & Feed Info
+            // ── Bottom Overlay: Location & Feed Info ─────────────────────────
             Positioned(
               bottom: 16,
               left: 14,
@@ -161,7 +162,10 @@ class _CameraListScreenState extends State<CameraListScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(10),
@@ -186,7 +190,10 @@ class _CameraListScreenState extends State<CameraListScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.65),
                       borderRadius: BorderRadius.circular(8),
@@ -195,7 +202,7 @@ class _CameraListScreenState extends State<CameraListScreen> {
                       ),
                     ),
                     child: const Text(
-                      '768p • 30 FPS',
+                      'WebRTC • 30 FPS',
                       style: TextStyle(
                         color: Colors.white60,
                         fontSize: 10.5,
